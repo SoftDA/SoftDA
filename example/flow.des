@@ -9,6 +9,6 @@ output depedency out;
 wire depedency w;
 
 PR    A(.i(in), .o(w));
-OT1 b(.i(w),  .o(out));
+OT1   b(.i(w),  .o(out));
 
 endmodule
