@@ -29,27 +29,48 @@ namespace filesystem = experimental::filesystem;
 
 namespace sda{
 
-struct Cell {
-  std::unordered_set<std::string> inputs;
-  std::unordered_set<std::string> outputs;
-
-  std::string args;
-};
-
-
 class Des{
-  public:
 
-    void parse_file(const std::filesystem::path&);
+  struct Instance{
+    std::string name;
+    std::string module_name;
+    std::unordered_map<std::string, std::string> pin2wire;
+    std::unordered_map<std::string, std::string> wire2pin;
+  };
+
+  struct Module{
+    std::string name;
+    std::unordered_set<std::string> inputs;
+    std::unordered_set<std::string> outputs;
+
+    std::unordered_map<std::string, std::pair<std::string, std::string>> wires;
+    std::unordered_map<std::string, Instance> instances;
+  };
+
+  public:
+    void parse_module(const std::filesystem::path&);
+
+
+  private:
+    std::unordered_set<std::string> _modules;
 
 };
 
 
-inline void Des::parse_file(const std::filesystem::path &p){
+inline void Des::parse_module(const std::filesystem::path &p){
   if(not std::filesystem::exists(p)){
-
     return;
   }
+
+  std::ifstream ifs(p);
+  if(not ifs.good()){
+    return;
+  }
+
+  
+  
+
+   
 }
 
 };  // end of namespace sda. ----------------------------------------------------------------------
