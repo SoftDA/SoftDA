@@ -1,0 +1,24 @@
+---
+prepare:
+  - os: ubuntu
+  - compiler: gcc
+  - version: 7.3
+  - dependency:
+      - apt-get update
+      - sudo apt-get install gcc-7
+      - sudo apt-get install g++-7
+  - build:
+      - g++ hello.cpp -o hello
+
+cell:
+  - name: PR
+  - binary: hello
+  - pin:
+      name: i
+      direction: in 
+      type: dependency
+  - pin:
+      name: o
+      direction: out
+      type: dependency 
+...
