@@ -1,9 +1,9 @@
-#include <ot/utility/tokenizer.hpp>
+#include <sda/utility/tokenizer.hpp>
 
 // TODO
 // 1. Consider removing the utf-8 bom (https://github.com/zer4tul/utf8-bom-strip)
 
-namespace ot {
+namespace sda {
 
 // Function: to_lower
 std::string to_lower(std::string s) {
@@ -238,6 +238,6 @@ std::vector<std::string> tokenize(
 }*/
 
 
-};  // end of namespace ot. -----------------------------------------------------------------------
+};  // end of namespace sda. ----------------------------------------------------------------------
 
 

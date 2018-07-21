@@ -1,9 +1,9 @@
-#ifndef OT_TIMER_INDEX_HPP_
-#define OT_TIMER_INDEX_HPP_
+#ifndef SDA_TIMER_INDEX_HPP_
+#define SDA_TIMER_INDEX_HPP_
 
 #include <vector>
 
-namespace ot {
+namespace sda {
 
 // Class: IndexGenerator
 template <typename T>
@@ -57,7 +57,7 @@ void IndexGenerator<T>::recycle(const T& idx) {
 }
 
 
-};  // end of namespace ot. -----------------------------------------------------------------------
+};  // end of namespace sda. ----------------------------------------------------------------------
 
 
 #endif

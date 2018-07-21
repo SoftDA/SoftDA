@@ -1,7 +1,7 @@
-#ifndef OT_UTILITY_LAMBDA_HPP_
-#define OT_UTILITY_LAMBDA_HPP_
+#ifndef SDA_UTILITY_LAMBDA_HPP_
+#define SDA_UTILITY_LAMBDA_HPP_
 
-namespace ot {
+namespace sda {
 
 template <typename T>
 struct CopyOnMove {
@@ -15,6 +15,6 @@ struct CopyOnMove {
 };
 
 
-};  // end of namespace ot. -----------------------------------------------------------------------
+};  // end of namespace sda. -----------------------------------------------------------------------
 
 #endif

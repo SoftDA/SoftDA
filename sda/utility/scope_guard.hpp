@@ -1,7 +1,7 @@
-#ifndef OT_UTILITY_SCOPE_GUARD_HPP_
-#define OT_UTILITY_SCOPE_GUARD_HPP_
+#ifndef SDA_UTILITY_SCOPE_GUARD_HPP_
+#define SDA_UTILITY_SCOPE_GUARD_HPP_
 
-namespace ot {
+namespace sda {
 
 template <typename F>
 class ScopeGuard {
@@ -42,7 +42,7 @@ auto make_scope_guard(F&& f) {
 }
 
 
-};  // end of namespace dtc. ----------------------------------------------------------------------
+};  // end of namespace sda. ----------------------------------------------------------------------
 
 
 

@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <memory>
 
-namespace ot {
+namespace sda {
 
 // Class: EnableSingletonFromThis
 // Guarantees that only a single instance of an object will exist throughout the
@@ -38,7 +38,7 @@ Derived& EnableSingletonFromThis<Derived>::get() {
   return object;
 }
 
-};  // End of ot namespace. --------------------------------------------------------------
+};  // End of sda namespace. --------------------------------------------------------------
 
 #endif
 

@@ -14,7 +14,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-namespace ot {
+namespace sda {
 
 // Enum: LogType
 enum class LogType {
@@ -294,7 +294,7 @@ void Logger<L>::fatal(const char* fpath, const int line, ArgsT&&... args) {
   _write<LogType::FATAL>(fpath, line, std::forward<ArgsT>(args)...);
 }
 
-};  // end of namespace ot. -----------------------------------------------------------------------
+};  // end of namespace sda. -----------------------------------------------------------------------
 
 #endif
 

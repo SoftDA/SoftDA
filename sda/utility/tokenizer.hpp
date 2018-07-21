@@ -14,7 +14,7 @@ namespace std {
   namespace filesystem = experimental::filesystem;
 };
 
-namespace ot {
+namespace sda {
 
 // string conversion
 std::string to_lower(std::string);
@@ -130,6 +130,6 @@ std::vector<std::string> tokenize(const std::filesystem::path&, std::string_view
 std::vector<std::string> tokenize(const std::string&, std::string_view="", std::string_view="");
 
 
-};  // end of namespace ot. -----------------------------------------------------------------------
+};  // end of namespace sda. ----------------------------------------------------------------------
 
 #endif

@@ -1,17 +1,17 @@
-#ifndef OT_UTILITY_UTILITY_HPP_
-#define OT_UTILITY_UTILITY_HPP_
+#ifndef SDA_UTILITY_UTILITY_HPP_
+#define SDA_UTILITY_UTILITY_HPP_
 
-#include <ot/utility/lambda.hpp>
-#include <ot/utility/logger.hpp>
-#include <ot/utility/tokenizer.hpp>
-#include <ot/utility/index.hpp>
-#include <ot/utility/iterator.hpp>
-#include <ot/utility/os.hpp>
-#include <ot/utility/scope_guard.hpp>
-#include <ot/utility/CLI11.hpp>
+#include <sda/utility/lambda.hpp>
+#include <sda/utility/logger.hpp>
+#include <sda/utility/tokenizer.hpp>
+#include <sda/utility/index.hpp>
+#include <sda/utility/iterator.hpp>
+#include <sda/utility/os.hpp>
+#include <sda/utility/scope_guard.hpp>
+#include <sda/utility/CLI11.hpp>
 
 // Miscellaneous
-namespace ot {
+namespace sda {
 
 // Resize a container to fit a given size
 template <typename T>
