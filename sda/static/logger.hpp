@@ -61,8 +61,3 @@ inline Logger<std::mutex> logger;
 
 #endif
 
-
-
-
-
-

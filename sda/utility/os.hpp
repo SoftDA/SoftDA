@@ -1,5 +1,5 @@
-#ifndef OT_UTILITY_OS_HPP_
-#define OT_UTILITY_OS_HPP_
+#ifndef SDA_UTILITY_OS_HPP_
+#define SDA_UTILITY_OS_HPP_
 
 #include <unistd.h>
 #include <pwd.h>
