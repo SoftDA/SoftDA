@@ -15,7 +15,7 @@ prepare:
       - cmake ../
 
 cell:
-  - name: Timer 
+  - name: OT2 
   - binary: ./bin/ot-shell
   - pin:
       name: i

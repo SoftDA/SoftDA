@@ -15,7 +15,7 @@ prepare:
       - make
 
 cell:
-  - name: Timer 
+  - name: OT1
   - binary: ./bin/OpenTimer
   - pin:
       name: i
