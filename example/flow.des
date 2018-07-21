@@ -1,0 +1,14 @@
+module Flow(
+  in,
+  out
+);
+
+input depedency in;
+output depedency out;
+
+wire depedency w;
+
+PR    A(.i(in), .o(w));
+Timer b(.i(w),  .o(out));
+
+endmodule

@@ -1,0 +1,27 @@
+---
+prepare:
+  - os: ubuntu
+  - compiler: gcc
+  - version: 7.3
+  - dependency:
+      - apt-get update
+      - sudo apt-get install gcc-7
+      - sudo apt-get install g++-7
+  - build:
+      - git clone https://github.com/OpenTimer/OpenTimer.git
+      - cd OpenTimer
+      - mkdir build
+      - cd build
+      - cmake ../
+
+cell:
+  - name: Timer 
+  - pin:
+      name: i
+      direction: in 
+      type: dependency
+  - pin:
+      name: o
+      direction: out
+      type: dependency
+...
