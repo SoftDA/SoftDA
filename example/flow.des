@@ -3,10 +3,16 @@ module Flow(
   out
 );
 
-input depedency in;
-output depedency out;
+input in;
+output out;
 
-wire depedency w;
+/* Remember to handle comment block */
+// Remember to handle single line comment
+# Remember to handle single line comment
+
+wire w dependency;
+
+// Remember to parse wire w stream syntax
 
 PR    A(.i(in), .o(w));
 OT1   b(.i(w),  .o(out));
