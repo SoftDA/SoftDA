@@ -16,6 +16,7 @@ prepare:
 
 cell:
   - name: Timer 
+  - binary: ./bin/ot-shell
   - pin:
       name: i
       direction: in 
