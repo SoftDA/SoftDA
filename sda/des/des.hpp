@@ -22,6 +22,7 @@
 #include <experimental/filesystem>
 #include <regex>
 #include <string_view>
+#include <cctype>
 
 namespace std {
 
@@ -64,10 +65,13 @@ class Des{
     void _keyword_wire();
     void _keyword_IO();
 
+
+    static constexpr auto is_char_valid = [](char c){ return std::isalnum(c) or c == '_'; };
 };
 
 inline void Des::_keyword_module(std::string_view buf){
-  const static std::regex del_head_tail_ws("^ +| +$");
+  static const std::regex del_head_tail_ws("^[ \t]+|[ \t]+$");
+
   size_t pos {6};  // Skip keyword "module"
 
   // Get the name of the module
@@ -80,22 +84,41 @@ inline void Des::_keyword_module(std::string_view buf){
   }
 
   // Get the left and right parenthese
-  auto l_par = buf.find_first_of('(', pos);
-  auto r_par = buf.find_first_of(')', pos);
+  const auto l_par {buf.find_first_of('(', pos)};
+  const auto r_par {buf.find_first_of(')', pos)};
   if(l_par == std::string::npos or 
      r_par == std::string::npos or
-     l_par > r_par or 
-     l_par == pos){
+     l_par > r_par){
     return ; // Invalid
   }
 
   std::string module_name {buf.substr(pos, l_par-pos)};
   module_name = std::regex_replace(module_name, del_head_tail_ws, "$1");
+  if(module_name.empty() or not std::all_of(module_name.begin(), module_name.end(), is_char_valid)){
+    return ; // Invalid
+  }
   
-  // Extract ports
+  // module M(
+  //   a, b, c
+  //   d,
+  //   e
+  // )
 
-  
-  
+  // Extract ports
+  pos = l_par + 1;
+  std::vector<std::string> ports;
+  while(pos < r_par){
+    auto comma = buf.find_first_of(",)", pos);
+    if(comma == pos){ // End of buf
+      break;
+    }
+    auto p = ports.emplace_back(buf.substr(pos, comma-pos));
+    p = std::regex_replace(module_name, del_head_tail_ws, "$1");
+    if(p.empty() or not std::all_of(p.begin(), p.end(), is_char_valid)){
+      return ; // Invalid
+    }
+    pos = comma + 1;
+  }
 }
 
 
