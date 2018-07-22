@@ -54,7 +54,7 @@ class Des{
     void parse_module(const std::filesystem::path&);
 
 
-  private:
+  //private:
     std::unordered_set<std::string> _modules;
 
     bool _next_valid_char(std::string_view, size_t&);
@@ -62,16 +62,15 @@ class Des{
     std::string _match_keyword(std::string_view, size_t = 0) const;
 
     void _keyword_module(std::string_view);
-    void _keyword_wire();
-    void _keyword_IO();
-
+    void _keyword_wire(std::string_view);
+    void _keyword_IO(std::string_view);
 
     static constexpr auto is_char_valid = [](char c){ return std::isalnum(c) or c == '_'; };
 };
 
 inline void Des::_keyword_module(std::string_view buf){
-  static const std::regex del_head_tail_ws("^[ \t]+|[ \t]+$");
-
+  // regex for deleting whitespace and tab
+  static const std::regex del_head_tail_ws("^[ \t\n]+|[ \t\n]+$");
   size_t pos {6};  // Skip keyword "module"
 
   // Get the name of the module
@@ -98,12 +97,6 @@ inline void Des::_keyword_module(std::string_view buf){
     return ; // Invalid
   }
   
-  // module M(
-  //   a, b, c
-  //   d,
-  //   e
-  // )
-
   // Extract ports
   pos = l_par + 1;
   std::vector<std::string> ports;
@@ -112,12 +105,31 @@ inline void Des::_keyword_module(std::string_view buf){
     if(comma == pos){ // End of buf
       break;
     }
-    auto p = ports.emplace_back(buf.substr(pos, comma-pos));
-    p = std::regex_replace(module_name, del_head_tail_ws, "$1");
+    auto& p = ports.emplace_back(buf.substr(pos, comma-pos));
+    p = std::regex_replace(p, del_head_tail_ws, "$1");
     if(p.empty() or not std::all_of(p.begin(), p.end(), is_char_valid)){
       return ; // Invalid
     }
     pos = comma + 1;
+  }
+}
+
+
+// wire w dependency;
+inline void Des::_keyword_wire(std::string_view buf){
+
+  if(buf.find_first_of('\n') != std::string::npos){
+    return ; // Invalid: should be a single line
+  }
+
+  size_t pos {4};  // Skip keyword "wire" 
+  // Get the name of the wire
+  if(auto ret=buf.find_first_not_of(" \t\n", pos); 
+    ret == std::string::npos or ret == pos){
+    return ; // Invalid
+  }
+  else{
+    ret += pos;
   }
 }
 
