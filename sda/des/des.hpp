@@ -65,8 +65,17 @@ class Des{
     void _keyword_wire(std::string_view);
     void _keyword_IO(std::string_view);
 
+    std::vector<std::string> _split_on_space(std::string&);
+
     static constexpr auto is_char_valid = [](char c){ return std::isalnum(c) or c == '_'; };
 };
+
+
+
+inline std::vector<std::string> _split_on_space(std::string& s){
+  static std::regex ws_re("\\s+");
+  return std::vector<std::string>(std::sregex_token_iterator(s.begin(), s.end(), ws_re, -1), {});
+}
 
 inline void Des::_keyword_module(std::string_view buf){
   // regex for deleting whitespace and tab
@@ -115,22 +124,45 @@ inline void Des::_keyword_module(std::string_view buf){
 }
 
 
-// wire w dependency;
+// wire my_wire dependency;
 inline void Des::_keyword_wire(std::string_view buf){
-
   if(buf.find_first_of('\n') != std::string::npos){
     return ; // Invalid: should be a single line
   }
 
-  size_t pos {4};  // Skip keyword "wire" 
-  // Get the name of the wire
-  if(auto ret=buf.find_first_not_of(" \t\n", pos); 
-    ret == std::string::npos or ret == pos){
+  if(buf.back() == ';'){
+    buf = buf.substr(0, buf.size()-1);
+  }
+
+  std::regex_token_iterator<std::string_view::iterator> end_of_buf;
+  std::regex ws_re("\\s+");
+  
+  // Get keyword "wire"
+  std::regex_token_iterator<std::string_view::iterator> iter(buf.begin(), buf.end(), ws_re, -1);
+  if(iter == end_of_buf or iter->compare("wire") != 0){
     return ; // Invalid
   }
-  else{
-    ret += pos;
+
+  // Get wire name
+  if(++iter == end_of_buf){
+    return ; // Invalid
   }
+  std::string_view wire_name(iter->str());
+
+  // Get wire type
+  if(++iter == end_of_buf or 
+    (iter->compare("stream") != 0 and iter->compare("dependency") != 0)){
+    return ; // Invalid
+  }
+  std::string_view wire_type(iter->str());
+  
+  // Last check
+  if(++iter != end_of_buf){
+    return ; // Invalid
+  }
+
+  std::cout << "name = " << wire_name << std::endl;
+  std::cout << "type = " << wire_type << std::endl;
 }
 
 
