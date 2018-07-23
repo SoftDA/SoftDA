@@ -63,23 +63,24 @@ class Des{
 
     void _keyword_module(std::string_view);
     void _keyword_wire(std::string_view);
-    void _keyword_IO(std::string_view);
+    void _keyword_io(std::string_view);
 
     std::vector<std::string> _split_on_space(std::string&);
 
     static constexpr auto is_char_valid = [](char c){ return std::isalnum(c) or c == '_'; };
+
 };
 
 
 
-inline std::vector<std::string> _split_on_space(std::string& s){
-  static std::regex ws_re("\\s+");
+inline std::vector<std::string> Des::_split_on_space(std::string& s){
+  std::regex ws_re ("\\s+");
   return std::vector<std::string>(std::sregex_token_iterator(s.begin(), s.end(), ws_re, -1), {});
 }
 
 inline void Des::_keyword_module(std::string_view buf){
   // regex for deleting whitespace and tab
-  static const std::regex del_head_tail_ws("^[ \t\n]+|[ \t\n]+$");
+  static const std::regex del_head_tailws("^[ \t\n]+|[ \t\n]+$");
   size_t pos {6};  // Skip keyword "module"
 
   // Get the name of the module
@@ -101,7 +102,7 @@ inline void Des::_keyword_module(std::string_view buf){
   }
 
   std::string module_name {buf.substr(pos, l_par-pos)};
-  module_name = std::regex_replace(module_name, del_head_tail_ws, "$1");
+  module_name = std::regex_replace(module_name, del_head_tailws, "$1");
   if(module_name.empty() or not std::all_of(module_name.begin(), module_name.end(), is_char_valid)){
     return ; // Invalid
   }
@@ -115,7 +116,7 @@ inline void Des::_keyword_module(std::string_view buf){
       break;
     }
     auto& p = ports.emplace_back(buf.substr(pos, comma-pos));
-    p = std::regex_replace(p, del_head_tail_ws, "$1");
+    p = std::regex_replace(p, del_head_tailws, "$1");
     if(p.empty() or not std::all_of(p.begin(), p.end(), is_char_valid)){
       return ; // Invalid
     }
@@ -135,8 +136,7 @@ inline void Des::_keyword_wire(std::string_view buf){
   }
 
   std::regex_token_iterator<std::string_view::iterator> end_of_buf;
-  std::regex ws_re("\\s+");
-  
+  std::regex ws_re ("\\s+");
   // Get keyword "wire"
   std::regex_token_iterator<std::string_view::iterator> iter(buf.begin(), buf.end(), ws_re, -1);
   if(iter == end_of_buf or iter->compare("wire") != 0){
@@ -166,13 +166,49 @@ inline void Des::_keyword_wire(std::string_view buf){
 }
 
 
+
+// wire my_wire dependency;
+inline void Des::_keyword_io(std::string_view buf){
+  if(buf.find_first_of('\n') != std::string::npos){
+    return ; // Invalid: should be a single line
+  }
+
+  if(buf.back() == ';'){
+    buf = buf.substr(0, buf.size()-1);
+  }
+
+  std::regex_token_iterator<std::string_view::iterator> end_of_buf;
+  std::regex ws_re ("\\s+");
+  std::regex_token_iterator<std::string_view::iterator> iter(buf.begin(), buf.end(), ws_re, -1);
+  if(iter == end_of_buf or 
+    (iter->compare("input") != 0 and iter->compare("output") != 0)){
+    return ; // Invalid
+  }
+
+  // Get keyword "input or output"
+  std::string_view io_type(iter->str());
+
+  // Get IO name
+  if(++iter == end_of_buf){
+    return ; // Invalid
+  }
+
+  std::string_view io_name(iter->str());
+
+  // Last check
+  if(++iter != end_of_buf){
+    return ; // Invalid
+  }
+
+  std::cout << "Type = " << io_type << "   Name = " << io_name << "\n";
+}
+
+
 inline std::string Des::_match_keyword(std::string_view buf, size_t pos) const {
   static const std::vector<std::string> keywords 
     {"module", "input", "output", "wire", "endmodule"};
-  for(const auto& k: keywords){
-    if(k.compare(0, k.size(), buf, pos) == 0){
-      return k;
-    }
+  if(auto iter=std::find(keywords.begin(), keywords.end(), buf); iter!=keywords.end()){
+    return *iter;
   }
   return {};
 }
