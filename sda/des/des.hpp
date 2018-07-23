@@ -61,15 +61,22 @@ class Des{
 
     std::string _match_keyword(std::string_view, size_t = 0) const;
 
-    void _keyword_module(std::string_view);
-    void _keyword_wire(std::string_view);
-    void _keyword_io(std::string_view);
+    void _keyword_module(std::string_view, Module&);
+    void _keyword_wire(std::string_view, Module&);
+    void _keyword_io(std::string_view, Module&);
+
+    void _parse_cell(std::string_view);
 
     std::vector<std::string> _split_on_space(std::string&);
 
-    static constexpr auto is_char_valid = [](char c){ return std::isalnum(c) or c == '_'; };
-
+    bool _is_word_valid(std::string_view);
 };
+
+
+inline bool Des::_is_word_valid(std::string_view sv){
+  static constexpr auto is_char_valid = [](char c){ return std::isalnum(c) or c == '_'; };
+  return std::all_of(sv.begin(), sv.end(), is_char_valid);
+}
 
 
 
@@ -78,7 +85,7 @@ inline std::vector<std::string> Des::_split_on_space(std::string& s){
   return std::vector<std::string>(std::sregex_token_iterator(s.begin(), s.end(), ws_re, -1), {});
 }
 
-inline void Des::_keyword_module(std::string_view buf){
+inline void Des::_keyword_module(std::string_view buf, Module& mod){
   // regex for deleting whitespace and tab
   static const std::regex del_head_tailws("^[ \t\n]+|[ \t\n]+$");
   size_t pos {6};  // Skip keyword "module"
@@ -103,7 +110,7 @@ inline void Des::_keyword_module(std::string_view buf){
 
   std::string module_name {buf.substr(pos, l_par-pos)};
   module_name = std::regex_replace(module_name, del_head_tailws, "$1");
-  if(module_name.empty() or not std::all_of(module_name.begin(), module_name.end(), is_char_valid)){
+  if(module_name.empty() or not _is_word_valid(module_name)){
     return ; // Invalid
   }
   
@@ -117,7 +124,7 @@ inline void Des::_keyword_module(std::string_view buf){
     }
     auto& p = ports.emplace_back(buf.substr(pos, comma-pos));
     p = std::regex_replace(p, del_head_tailws, "$1");
-    if(p.empty() or not std::all_of(p.begin(), p.end(), is_char_valid)){
+    if(p.empty() or not _is_word_valid(p)){
       return ; // Invalid
     }
     pos = comma + 1;
@@ -126,7 +133,7 @@ inline void Des::_keyword_module(std::string_view buf){
 
 
 // wire my_wire dependency;
-inline void Des::_keyword_wire(std::string_view buf){
+inline void Des::_keyword_wire(std::string_view buf, Module& mod){
   if(buf.find_first_of('\n') != std::string::npos){
     return ; // Invalid: should be a single line
   }
@@ -167,8 +174,8 @@ inline void Des::_keyword_wire(std::string_view buf){
 
 
 
-// wire my_wire dependency;
-inline void Des::_keyword_io(std::string_view buf){
+// input primary_input;
+inline void Des::_keyword_io(std::string_view buf, Module& mod){
   if(buf.find_first_of('\n') != std::string::npos){
     return ; // Invalid: should be a single line
   }
@@ -201,6 +208,75 @@ inline void Des::_keyword_io(std::string_view buf){
   }
 
   std::cout << "Type = " << io_type << "   Name = " << io_name << "\n";
+}
+
+
+
+// PR    A(.i(in), .o(w));
+inline void Des::_parse_cell(std::string_view buf){
+  if(buf.back() == ';'){
+    buf = buf.substr(0, buf.size()-1);
+  }
+
+  std::string::size_type pre_pos {0};
+  std::string::size_type pos {0};
+  if(pos = buf.find_first_of(" \t"); pos == std::string::npos){
+    return ; // Invalid
+  }
+
+  // Get cell name
+  std::string_view cell_name(&buf[0], pos);
+
+  pre_pos = buf.find_first_not_of(" \t", pos);
+  if(pre_pos == std::string::npos){
+    return ; // Invalid
+  }
+  if(pos = buf.find_first_of(" (\t", pre_pos); pos == std::string::npos){
+    return ; // Invalid
+  }
+  // Get instance name
+  std::string_view inst_name(&buf[pre_pos], pos-pre_pos);
+
+  std::string::size_type dot {0}; 
+  std::string::size_type l_par {0}; 
+  std::string::size_type r_par {pos}; 
+
+  std::vector<std::string_view> port_names;
+  std::vector<std::string_view> wire_names;
+
+  while(1){
+    if(dot = buf.find_first_of('.', r_par); dot == std::string::npos){
+      break;  // Parse end
+    }
+    if(l_par = buf.find_first_of('(', dot); 
+      l_par == std::string::npos or l_par == dot+1){
+      return ;  // Invalid
+    }
+    if(r_par = buf.find_first_of(')', l_par); 
+      r_par == std::string::npos or r_par == l_par+1){
+      return ;  // Invalid
+    }
+
+    if(auto& p = port_names.emplace_back(&buf[dot+1], l_par-dot-1); 
+       not _is_word_valid(p)){
+      return ;  // Invalid
+    }
+
+    if(auto& w = wire_names.emplace_back(&buf[l_par+1], r_par-l_par-1); 
+       not _is_word_valid(w)){
+      return ;  // Invalid
+    }
+  }
+
+  if(port_names.empty()){
+    return ; // Invalid
+  }
+
+  std::cout << "Cell name = " << cell_name << '\n';
+  std::cout << "Inst name = " << inst_name << '\n';
+  for(size_t i=0; i<port_names.size(); i++){
+    std::cout << port_names[i] << " : " << wire_names[i] << '\n';
+  }
 }
 
 
