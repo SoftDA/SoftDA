@@ -103,8 +103,6 @@ inline const std::unordered_map<std::string, Des::Module>& Des::get_all_modules(
 }
 
 
-
-
 inline std::string Des::dump_module(const std::string& module_name) const {
   if(_modules.find(module_name) == _modules.end()){
     return std::string();
@@ -434,22 +432,24 @@ inline bool Des::_next_valid_char(std::string_view buf, size_t& pos){
         pos = ret+1;
         break;
       case '/':
-        if(pos != buf.size()-1){
-          if(buf[pos+1] == '/'){
+        if(pos >= buf.size()-1){
+          return false;
+        }
+        switch(buf[pos+1]){
+          case '/':
             if(ret=buf.find_first_of("\n", pos+1); ret == std::string::npos){  // Skip current line
               return true;
             }
             pos = ret+1;
-          }
-          else if(buf[pos+1] == '*'){
+            break;
+          case '*':
             if(ret=buf.find("*/", pos+1); ret == std::string::npos){
               return false;
             }
             pos = ret+2;
-          }
-        }
-        else{
-          return false; // invalid comment
+            break;
+          default:
+            return false;
         }
         break;
       default:
