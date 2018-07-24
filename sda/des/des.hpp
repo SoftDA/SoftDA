@@ -34,16 +34,29 @@ namespace sda{
 
 class Des{
 
+  enum class Keyword{
+    NONE = 0,
+    MODULE,  
+    INPUT, 
+    OUTPUT, 
+    WIRE, 
+    ENDMODULE
+  };
+
   struct Instance{
     Instance() = default;
+
     std::string name;
     std::string module_name;
+
     std::unordered_map<std::string, std::string> pin2wire;
     std::unordered_map<std::string, std::string> wire2pin;
   };
 
   struct Module{
     std::string name;
+
+    Module() = default;
 
     std::unordered_set<std::string> ports;
     std::unordered_set<std::string_view> inputs;
@@ -56,15 +69,19 @@ class Des{
   };
 
   public:
-    void parse_module(const std::filesystem::path&);
+    bool parse_module(const std::filesystem::path&);
 
+    std::string dump_module(const std::string&) const;
+    const std::unordered_map<std::string, Module>& get_all_modules() const;
 
-  //private:
-    std::unordered_set<std::string> _modules;
+  private:
+
+    std::unordered_map<std::string, Module> _modules;
+
 
     bool _next_valid_char(std::string_view, size_t&);
 
-    std::string _match_keyword(std::string_view, size_t = 0) const;
+    Keyword _match_keyword(std::string_view, size_t = 0) const;
 
     bool _keyword_module(std::string_view, Module&);
     bool _keyword_wire(std::string_view, Module&);
@@ -76,8 +93,64 @@ class Des{
 
     bool _is_word_valid(std::string_view);
 
-    std::regex _del_head_tailws {"^[ \t\n]+|[ \t\n]+$"};
+    std::regex _del_head_tail_ws {"^[ \t\n]+|[ \t\n]+$"};
+    std::regex _ws_re {"\\s+"};
 };
+
+
+inline const std::unordered_map<std::string, Des::Module>& Des::get_all_modules() const {
+  return _modules;
+}
+
+
+
+
+inline std::string Des::dump_module(const std::string& module_name) const {
+  if(_modules.find(module_name) == _modules.end()){
+    return std::string();
+  }
+  
+  std::string str;
+  auto m = _modules.at(module_name);
+
+  str.append("module ").append(m.name).append("(");
+  for(const auto& p: m.ports){
+    str.append(p).append(",\n");
+
+  }
+  if(not m.ports.empty()){
+    str.erase(str.size()-2);
+  }
+  str.append(");\n");
+
+  for(const auto& p: m.inputs){
+    str.append("input ").append(p).append(";\n");
+  }
+
+
+  for(const auto& p: m.outputs){
+    str.append("output ").append(p).append(";\n");
+  }
+
+  for(const auto& p: m.dependency_wire){
+    str.append("wire ").append(p).append("dependency;\n");
+  }
+
+  for(const auto& p: m.stream_wire){
+    str.append("wire ").append(p).append("stream;\n");
+  }
+
+  for(const auto&[k ,v]: m.instances){
+    str.append(v.module_name).append(1, ' ').append(k).append(1, '(');
+    for(const auto& [p, w]: v.pin2wire){
+      str.append(1, '.').append(p).append(1, '(').append(w).append("), ");
+    }
+    str.erase(str.size()-2);
+    str.append(");\n");
+  }
+
+  return str.append("endmodule\n");
+}
 
 
 // Function: _is_word_valid 
@@ -92,11 +165,11 @@ inline bool Des::_is_word_valid(std::string_view sv){
 
 
 inline std::vector<std::string> Des::_split_on_space(std::string& s){
-  std::regex ws_re ("\\s+");
-  return std::vector<std::string>(std::sregex_token_iterator(s.begin(), s.end(), ws_re, -1), {});
+  return std::vector<std::string>(std::sregex_token_iterator(s.begin(), s.end(), _ws_re, -1), {});
 }
 
 inline bool Des::_keyword_module(std::string_view buf, Module& mod){
+
   // regex for deleting whitespace and tab
   size_t pos {6};  // Skip keyword "module"
 
@@ -106,28 +179,30 @@ inline bool Des::_keyword_module(std::string_view buf, Module& mod){
     return false; // Invalid
   }
   else{
-    ret += pos;
+    pos = ret;
   }
 
   // Get the left and right parenthese
   const auto l_par {buf.find_first_of('(', pos)};
   const auto r_par {buf.find_first_of(')', pos)};
+
   // Check unique left and right parenthese and their positions
   if(l_par == std::string::npos or 
      r_par == std::string::npos or 
      l_par > r_par or
-     buf.find_last_of('(', l_par+1) != std::string::npos or 
-     buf.find_last_of('r', r_par+1) != std::string::npos){
+     buf.find_first_of('(', l_par+1) != std::string::npos or 
+     buf.find_first_of(')', r_par+1) != std::string::npos){
     return false; // Invalid
   }
 
+  // Get module name 
   mod.name.resize(l_par-pos);
-  buf.copy(mod.name.data(), l_par-pos);
-  mod.name = std::regex_replace(mod.name, _del_head_tailws, "$1");
+  buf.copy(mod.name.data(), l_par-pos, pos);
+  mod.name = std::regex_replace(mod.name, _del_head_tail_ws, "$1");
   if(mod.name.empty() or not _is_word_valid(mod.name)){
     return false; // Invalid
   }
-  
+ 
   // Extract ports
   pos = l_par + 1;
   while(pos < r_par){
@@ -136,7 +211,7 @@ inline bool Des::_keyword_module(std::string_view buf, Module& mod){
       break;
     }
     std::string p(buf.data(), pos, comma-pos);
-    p = std::regex_replace(p, _del_head_tailws, "$1");
+    p = std::regex_replace(p, _del_head_tail_ws, "$1");
     if(p.empty() or mod.ports.find(p) != mod.ports.end()){
       return false; // Invalid
     }
@@ -158,9 +233,8 @@ inline bool Des::_keyword_wire(std::string_view buf, Module& mod){
   }
 
   std::regex_token_iterator<std::string_view::iterator> end_of_buf;
-  std::regex ws_re ("\\s+");
   // Get keyword "wire"
-  std::regex_token_iterator<std::string_view::iterator> iter(buf.begin(), buf.end(), ws_re, -1);
+  std::regex_token_iterator<std::string_view::iterator> iter(buf.begin(), buf.end(), _ws_re, -1);
   if(iter == end_of_buf or iter->compare("wire") != 0){
     return false; // Invalid
   }
@@ -192,8 +266,6 @@ inline bool Des::_keyword_wire(std::string_view buf, Module& mod){
     mod.dependency_wire.insert(std::move(wire_name));
   }
 
-  std::cout << "name = " << wire_name << std::endl;
-  std::cout << "type = " << wire_type << std::endl;
   return true;
 }
 
@@ -210,8 +282,7 @@ inline bool Des::_keyword_io(std::string_view buf, Module& mod){
   }
 
   std::regex_token_iterator<std::string_view::iterator> end_of_buf;
-  std::regex ws_re ("\\s+");
-  std::regex_token_iterator<std::string_view::iterator> iter(buf.begin(), buf.end(), ws_re, -1);
+  std::regex_token_iterator<std::string_view::iterator> iter(buf.begin(), buf.end(), _ws_re, -1);
   if(iter == end_of_buf or 
     (iter->compare("input") != 0 and iter->compare("output") != 0)){
     return false; // Invalid
@@ -231,16 +302,14 @@ inline bool Des::_keyword_io(std::string_view buf, Module& mod){
   if(++iter != end_of_buf or mod.ports.find(io_name) == mod.ports.end()){
     return false; // Invalid
   }
-  mod.ports.erase(io_name);  
 
   if(io_type.compare("input") == 0){
-    mod.inputs.insert(std::move(io_name));
+    mod.inputs.insert(*mod.ports.find(io_name));
   }
   else{
-    mod.outputs.insert(std::move(io_name));
+    mod.outputs.insert(*mod.ports.find(io_name));
   }
 
-  std::cout << "Type = " << io_type << "   Name = " << io_name << "\n";
   return true;
 }
 
@@ -305,8 +374,8 @@ inline bool Des::_parse_cell(std::string_view buf, Module& mod){
     std::string pin_name({&buf[dot+1], l_par-dot-1});
     std::string wire_name({&buf[l_par+1], r_par-l_par-1});
 
-    pin_name = std::regex_replace(pin_name, _del_head_tailws, "$1");
-    wire_name = std::regex_replace(wire_name, _del_head_tailws, "$1");
+    pin_name = std::regex_replace(pin_name, _del_head_tail_ws, "$1");
+    wire_name = std::regex_replace(wire_name, _del_head_tail_ws, "$1");
 
     // Check the pin name and wire name
     if(not _is_word_valid(pin_name) or 
@@ -321,16 +390,27 @@ inline bool Des::_parse_cell(std::string_view buf, Module& mod){
   if(inst->second.pin2wire.empty()){
     return false; // Invalid
   }
+  return true;
 }
 
 
-inline std::string Des::_match_keyword(std::string_view buf, size_t pos) const {
-  static const std::vector<std::string> keywords 
-    {"module", "input", "output", "wire", "endmodule"};
-  if(auto iter=std::find(keywords.begin(), keywords.end(), buf); iter!=keywords.end()){
-    return *iter;
+inline Des::Keyword Des::_match_keyword(std::string_view buf, size_t pos) const {
+  static const std::unordered_map<std::string_view, Keyword> keywords = {
+    {"module",    Keyword::MODULE},
+    {"input",     Keyword::INPUT},
+    {"output",    Keyword::OUTPUT},
+    {"wire",      Keyword::WIRE},
+    {"endmodule", Keyword::ENDMODULE}
+  };
+
+  for(const auto& iter: keywords){
+    //if(iter.first.compare(pos, iter.first.size(), buf) == 0){
+    if(buf.compare(pos, iter.first.size(), iter.first) == 0){
+      return iter.second;
+    }
   }
-  return {};
+
+  return Keyword::NONE;
 }
 
 
@@ -340,17 +420,16 @@ inline bool Des::_next_valid_char(std::string_view buf, size_t& pos){
     switch(buf[pos]){
       case '\n':
       case ' ':
-      case '\t':
-      case '*':
-        if(buf[pos] != '*'){
-          ret=buf.find_first_not_of(" \t\n", pos+1);  // Skip all whitespace and newline
-        }
-        else{
-          ret=buf.find_first_of("\n", pos+1);         // Skip current line
-        }
+      case '\t': 
+        ret=buf.find_first_not_of(" \t\n", pos+1);  // Skip all whitespace and newline
         if(ret == std::string::npos){
-          pos = buf.size();
-          return true;
+          return false;
+        }
+        pos = ret;
+        break;
+      case '#':
+        if(ret=buf.find_first_of("\n", pos+1); ret == std::string::npos){
+          return false;
         }
         pos = ret+1;
         break;
@@ -378,38 +457,85 @@ inline bool Des::_next_valid_char(std::string_view buf, size_t& pos){
         break;    
     }
   }
+  return false;
 }
 
-inline void Des::parse_module(const std::filesystem::path &p){
+inline bool Des::parse_module(const std::filesystem::path &p){
   if(not std::filesystem::exists(p)){
-    return;
+    return false;
   }
 
   std::ifstream ifs(p);
   if(not ifs.good()){
-    return;
+    return false;
   }
 
   // Read the file to a local buffer.
-  ifs.seekg(0, std::ios::beg);
+  ifs.seekg(0, std::ios::end);
   std::string buffer(ifs.tellg(), ' ');
   ifs.seekg(0);
   ifs.read(&buffer[0], buffer.size());
 
+  Module mod;
   size_t pos {0};
   while(pos < buffer.size()){
-    if(_next_valid_char(buffer, pos)){
-      if(auto keyword=_match_keyword(buffer, pos); keyword.size() > 0){
-        
-      }
-      else{
-      }
+    // Skip whitespace and comments
+    if(not _next_valid_char(buffer, pos)){
+      printf("fail not next valid\n");
+      return false;
     }
-    else{
-      // Invalid content 
-      break;
+
+    // Retrieve keyword
+    auto keyword=_match_keyword(buffer, pos);
+
+    // Find semicolon position 
+    const auto semicol_pos {buffer.find_first_of(';', pos)};
+    if(keyword != Keyword::ENDMODULE and semicol_pos == std::string::npos){
+      return false;
+    }
+
+    // Process current line
+    switch(keyword){
+      case Keyword::MODULE:
+        if(not _keyword_module({&buffer[pos], semicol_pos-pos}, mod)){
+          std::cout << std::string_view(&buffer[pos], semicol_pos-pos) << "\n";
+          printf("fail module\n");
+          return false;
+        }
+        printf("ok module\n");
+        pos = semicol_pos+1;
+        break;
+      case Keyword::INPUT:
+      case Keyword::OUTPUT:           
+        if(not _keyword_io({&buffer[pos], semicol_pos-pos}, mod)){ 
+          printf("fail io\n");
+          return false;
+        }
+        printf("ok io\n");
+        pos = semicol_pos+1;
+        break;
+      case Keyword::WIRE:
+        if(not _keyword_wire({&buffer[pos], semicol_pos-pos}, mod)){
+          printf("fail wire\n");
+          return false;
+        }
+        pos = semicol_pos+1;
+        break;
+      case Keyword::ENDMODULE:
+        pos = buffer.size();
+        break;
+      default:
+        if(not _parse_cell({&buffer[pos], semicol_pos-pos}, mod)){
+          printf("fail cell\n");
+          std::cout << std::string_view(&buffer[pos], semicol_pos-pos) << "\n";
+          return false;
+        }
+        pos = semicol_pos+1;
+        break;
     }
   }
+  _modules.insert({mod.name, std::move(mod)});
+  return true;
 }
 
 };  // end of namespace sda. ----------------------------------------------------------------------

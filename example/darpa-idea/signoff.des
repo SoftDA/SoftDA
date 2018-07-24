@@ -1,7 +1,6 @@
-import flow.des
 
 module Signoff(
-  in1, in2, in3
+  in1, in2, in3,
   out1, out2, out3
 );
 
