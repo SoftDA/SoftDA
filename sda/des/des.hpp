@@ -35,6 +35,7 @@ namespace sda{
 class Des{
 
   struct Instance{
+    Instance() = default;
     std::string name;
     std::string module_name;
     std::unordered_map<std::string, std::string> pin2wire;
@@ -51,7 +52,6 @@ class Des{
     std::unordered_set<std::string> dependency_wire;   
     std::unordered_set<std::string> stream_wire;   
 
-    std::unordered_map<std::string, std::pair<std::string, std::string>> wires;
     std::unordered_map<std::string, Instance> instances;
   };
 
@@ -70,17 +70,23 @@ class Des{
     bool _keyword_wire(std::string_view, Module&);
     bool _keyword_io(std::string_view, Module&);
 
-    void _parse_cell(std::string_view);
+    bool _parse_cell(std::string_view, Module&);
 
     std::vector<std::string> _split_on_space(std::string&);
 
     bool _is_word_valid(std::string_view);
+
+    std::regex _del_head_tailws {"^[ \t\n]+|[ \t\n]+$"};
 };
 
 
+// Function: _is_word_valid 
+// Check the chars must be either alphabets or digits or underscore
+// and the first char must be an alphabet or underscore.
 inline bool Des::_is_word_valid(std::string_view sv){
-  static constexpr auto is_char_valid = [](char c){ return std::isalnum(c) or c == '_'; };
-  return std::all_of(sv.begin(), sv.end(), is_char_valid);
+  static constexpr auto is_char_valid = [](char c){return (std::isalnum(c) or c == '_');};
+  return not sv.empty() and std::all_of(sv.begin(), sv.end(), is_char_valid) and 
+         (std::isalpha(sv[0]) or sv[0] == '_');
 }
 
 
@@ -92,7 +98,6 @@ inline std::vector<std::string> Des::_split_on_space(std::string& s){
 
 inline bool Des::_keyword_module(std::string_view buf, Module& mod){
   // regex for deleting whitespace and tab
-  static const std::regex del_head_tailws("^[ \t\n]+|[ \t\n]+$");
   size_t pos {6};  // Skip keyword "module"
 
   // Get the name of the module
@@ -118,7 +123,7 @@ inline bool Des::_keyword_module(std::string_view buf, Module& mod){
 
   mod.name.resize(l_par-pos);
   buf.copy(mod.name.data(), l_par-pos);
-  mod.name = std::regex_replace(mod.name, del_head_tailws, "$1");
+  mod.name = std::regex_replace(mod.name, _del_head_tailws, "$1");
   if(mod.name.empty() or not _is_word_valid(mod.name)){
     return false; // Invalid
   }
@@ -131,7 +136,7 @@ inline bool Des::_keyword_module(std::string_view buf, Module& mod){
       break;
     }
     std::string p(buf.data(), pos, comma-pos);
-    p = std::regex_replace(p, del_head_tailws, "$1");
+    p = std::regex_replace(p, _del_head_tailws, "$1");
     if(p.empty() or mod.ports.find(p) != mod.ports.end()){
       return false; // Invalid
     }
@@ -212,7 +217,7 @@ inline bool Des::_keyword_io(std::string_view buf, Module& mod){
     return false; // Invalid
   }
 
-  // Get keyword "input or output"
+  // Get keyword "input/output"
   std::string_view io_type(iter->str());
 
   // Get IO name
@@ -242,7 +247,7 @@ inline bool Des::_keyword_io(std::string_view buf, Module& mod){
 
 
 // PR    A(.i(in), .o(w));
-inline void Des::_parse_cell(std::string_view buf){
+inline bool Des::_parse_cell(std::string_view buf, Module& mod){
   if(buf.back() == ';'){
     buf = buf.substr(0, buf.size()-1);
   }
@@ -250,28 +255,39 @@ inline void Des::_parse_cell(std::string_view buf){
   std::string::size_type pre_pos {0};
   std::string::size_type pos {0};
   if(pos = buf.find_first_of(" \t"); pos == std::string::npos){
-    return ; // Invalid
+    return false; // Invalid
   }
 
-  // Get cell name
-  std::string_view cell_name(&buf[0], pos);
+  // Get cell name 
+  if(not _is_word_valid({&buf[0], pos})){
+    return false;
+  }
+  std::string module_name(&buf[0], pos);
 
-  pre_pos = buf.find_first_not_of(" \t", pos);
-  if(pre_pos == std::string::npos){
-    return ; // Invalid
+  // Move cursors to the beg/end of instance name
+  if(pre_pos = buf.find_first_not_of(" \t", pos); pre_pos == std::string::npos){
+    return false; // Invalid
   }
   if(pos = buf.find_first_of(" (\t", pre_pos); pos == std::string::npos){
-    return ; // Invalid
+    return false; // Invalid
   }
-  // Get instance name
-  std::string_view inst_name(&buf[pre_pos], pos-pre_pos);
+
+  // Get instance name 
+  if(not _is_word_valid({&buf[pre_pos], pos-pre_pos})){
+    return false;
+  }
+  std::string inst_name(&buf[pre_pos], pos-pre_pos);
+
+  auto [inst, inserted] = mod.instances.insert({inst_name, Instance()});
+  if(not inserted){
+    return false;
+  }
+  inst->second.name = std::move(inst_name);
+  inst->second.module_name = std::move(module_name);
 
   std::string::size_type dot {0}; 
   std::string::size_type l_par {0}; 
   std::string::size_type r_par {pos}; 
-
-  std::vector<std::string_view> port_names;
-  std::vector<std::string_view> wire_names;
 
   while(1){
     if(dot = buf.find_first_of('.', r_par); dot == std::string::npos){
@@ -279,32 +295,31 @@ inline void Des::_parse_cell(std::string_view buf){
     }
     if(l_par = buf.find_first_of('(', dot); 
       l_par == std::string::npos or l_par == dot+1){
-      return ;  // Invalid
+      return false;  // Invalid
     }
     if(r_par = buf.find_first_of(')', l_par); 
       r_par == std::string::npos or r_par == l_par+1){
-      return ;  // Invalid
+      return false;  // Invalid
     }
 
-    if(auto& p = port_names.emplace_back(&buf[dot+1], l_par-dot-1); 
-       not _is_word_valid(p)){
-      return ;  // Invalid
+    std::string pin_name({&buf[dot+1], l_par-dot-1});
+    std::string wire_name({&buf[l_par+1], r_par-l_par-1});
+
+    pin_name = std::regex_replace(pin_name, _del_head_tailws, "$1");
+    wire_name = std::regex_replace(wire_name, _del_head_tailws, "$1");
+
+    // Check the pin name and wire name
+    if(not _is_word_valid(pin_name) or 
+       not _is_word_valid(wire_name)){ 
+      return false;
     }
 
-    if(auto& w = wire_names.emplace_back(&buf[l_par+1], r_par-l_par-1); 
-       not _is_word_valid(w)){
-      return ;  // Invalid
-    }
+    inst->second.pin2wire.insert({pin_name, wire_name});
+    inst->second.wire2pin.insert({wire_name, pin_name});
   }
 
-  if(port_names.empty()){
-    return ; // Invalid
-  }
-
-  std::cout << "Cell name = " << cell_name << '\n';
-  std::cout << "Inst name = " << inst_name << '\n';
-  for(size_t i=0; i<port_names.size(); i++){
-    std::cout << port_names[i] << " : " << wire_names[i] << '\n';
+  if(inst->second.pin2wire.empty()){
+    return false; // Invalid
   }
 }
 
