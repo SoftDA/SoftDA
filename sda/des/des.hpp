@@ -78,11 +78,9 @@ class Des{
 
     std::unordered_map<std::string, Module> _modules;
 
-
-    bool _next_valid_char(std::string_view, size_t&);
-
     Keyword _match_keyword(std::string_view, size_t = 0) const;
 
+    bool _next_valid_char(std::string_view, size_t&);
     bool _keyword_module(std::string_view, Module&);
     bool _keyword_wire(std::string_view, Module&);
     bool _keyword_io(std::string_view, Module&);
@@ -114,7 +112,6 @@ inline std::string Des::dump_module(const std::string& module_name) const {
   str.append("module ").append(m.name).append("(");
   for(const auto& p: m.ports){
     str.append(p).append(",\n");
-
   }
   if(not m.ports.empty()){
     str.erase(str.size()-2);
@@ -124,7 +121,6 @@ inline std::string Des::dump_module(const std::string& module_name) const {
   for(const auto& p: m.inputs){
     str.append("input ").append(p).append(";\n");
   }
-
 
   for(const auto& p: m.outputs){
     str.append("output ").append(p).append(";\n");
@@ -167,8 +163,6 @@ inline std::vector<std::string> Des::_split_on_space(std::string& s){
 }
 
 inline bool Des::_keyword_module(std::string_view buf, Module& mod){
-
-  // regex for deleting whitespace and tab
   size_t pos {6};  // Skip keyword "module"
 
   // Get the name of the module
@@ -402,7 +396,6 @@ inline Des::Keyword Des::_match_keyword(std::string_view buf, size_t pos) const 
   };
 
   for(const auto& iter: keywords){
-    //if(iter.first.compare(pos, iter.first.size(), buf) == 0){
     if(buf.compare(pos, iter.first.size(), iter.first) == 0){
       return iter.second;
     }
