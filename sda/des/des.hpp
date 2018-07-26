@@ -54,18 +54,43 @@ class Des{
   };
 
   struct Module{
-    std::string name;
-
     Module() = default;
 
-    std::unordered_set<std::string> ports;
-    std::unordered_set<std::string_view> inputs;
-    std::unordered_set<std::string_view> outputs;
+    std::string name;
 
-    std::unordered_set<std::string> dependency_wire;   
-    std::unordered_set<std::string> stream_wire;   
+    std::unordered_set<std::string> ports;
+    // port name, inst name
+    std::unordered_map<std::string_view, std::string> inputs;
+    std::unordered_map<std::string_view, std::string> outputs;
+
+    // wire name, <inst 1 name, inst 2 name>
+    std::unordered_map<std::string, std::pair<std::string, std::string>> dependency_wire;   
+    std::unordered_map<std::string, std::pair<std::string, std::string>> stream_wire;
 
     std::unordered_map<std::string, Instance> instances;
+  };
+
+  struct Vertex{
+    Vertex() = default;
+    std::string module_name;
+    std::unordered_set<std::string> edges;
+  };
+
+  struct Edge{
+    std::string name;
+    std::string from;
+    std::string to;
+  };
+
+  struct Graph{
+    Graph() = default;
+    std::unordered_set<std::string> pi;
+    std::unordered_set<std::string> po;
+
+    std::unordered_map<std::string, Vertex> vertices;
+    std::unordered_map<std::string, Edge> edges;
+
+    void add_graph(const Graph&);
   };
 
   public:
@@ -74,7 +99,13 @@ class Des{
     std::string dump_module(const std::string&) const;
     const std::unordered_map<std::string, Module>& get_all_modules() const;
 
+    void build_graph();
+
   private:
+
+    std::unordered_map<std::string_view, Vertex> _libs;
+    std::unordered_map<std::string_view, Graph> _graphs;
+    void _build_graph(const std::string&);
 
     std::unordered_map<std::string, Module> _modules;
 
@@ -94,6 +125,9 @@ class Des{
     std::regex _del_head_tail_ws {"^[ \t\n]+|[ \t\n]+$"};
     std::regex _ws_re {"\\s+"};
 };
+
+inline void Des::Graph::add_graph(const Graph& other){
+}
 
 
 inline const std::unordered_map<std::string, Des::Module>& Des::get_all_modules() const {
@@ -119,19 +153,19 @@ inline std::string Des::dump_module(const std::string& module_name) const {
   str.append(");\n");
 
   for(const auto& p: m.inputs){
-    str.append("input ").append(p).append(";\n");
+    str.append("input ").append(p.first).append(";\n");
   }
 
   for(const auto& p: m.outputs){
-    str.append("output ").append(p).append(";\n");
+    str.append("output ").append(p.first).append(";\n");
   }
 
   for(const auto& p: m.dependency_wire){
-    str.append("wire ").append(p).append("dependency;\n");
+    str.append("wire ").append(p.first).append("dependency;\n");
   }
 
   for(const auto& p: m.stream_wire){
-    str.append("wire ").append(p).append("stream;\n");
+    str.append("wire ").append(p.first).append("stream;\n");
   }
 
   for(const auto&[k ,v]: m.instances){
@@ -252,10 +286,10 @@ inline bool Des::_keyword_wire(std::string_view buf, Module& mod){
   }
 
   if(wire_type.compare("stream") == 0){
-    mod.stream_wire.insert(std::move(wire_name));
+    mod.stream_wire.insert({std::move(wire_name), {}});
   }
   else{
-    mod.dependency_wire.insert(std::move(wire_name));
+    mod.dependency_wire.insert({std::move(wire_name), {}});
   }
 
   return true;
@@ -296,10 +330,10 @@ inline bool Des::_keyword_io(std::string_view buf, Module& mod){
   }
 
   if(io_type.compare("input") == 0){
-    mod.inputs.insert(*mod.ports.find(io_name));
+    mod.inputs.insert({*mod.ports.find(io_name), {}});
   }
   else{
-    mod.outputs.insert(*mod.ports.find(io_name));
+    mod.outputs.insert({*mod.ports.find(io_name), {}});
   }
 
   return true;
@@ -350,6 +384,17 @@ inline bool Des::_parse_cell(std::string_view buf, Module& mod){
   std::string::size_type l_par {0}; 
   std::string::size_type r_par {pos}; 
 
+
+  // A lambda to set the pin names of an edge
+  auto set_pin_name = [](std::pair<std::string, std::string>& e, std::string& pin){
+    if(e.first.empty()){
+      e.first = pin;
+    }
+    else{
+      e.second = pin;
+    }
+  };
+
   while(1){
     if(dot = buf.find_first_of('.', r_par); dot == std::string::npos){
       break;  // Parse end
@@ -364,7 +409,7 @@ inline bool Des::_parse_cell(std::string_view buf, Module& mod){
     }
 
     std::string pin_name({&buf[dot+1], l_par-dot-1});
-    std::string wire_name({&buf[l_par+1], r_par-l_par-1});
+    std::string wire_name({&buf[l_par+1], r_par-l_par-1}); // A wire could be an input or output
 
     pin_name = std::regex_replace(pin_name, _del_head_tail_ws, "$1");
     wire_name = std::regex_replace(wire_name, _del_head_tail_ws, "$1");
@@ -373,6 +418,28 @@ inline bool Des::_parse_cell(std::string_view buf, Module& mod){
     if(not _is_word_valid(pin_name) or 
        not _is_word_valid(wire_name)){ 
       return false;
+    }
+
+    // Check wire should exist. (wire is always declared before the inst)
+    if(mod.dependency_wire.find(wire_name) == mod.dependency_wire.end()and 
+       mod.stream_wire.find(wire_name) == mod.stream_wire.end() and 
+       mod.inputs.find(wire_name) == mod.inputs.end() and 
+       mod.outputs.find(wire_name) == mod.outputs.end()){
+      return false;
+    }
+
+
+    if(mod.inputs.find(wire_name) != mod.inputs.end()){
+      mod.inputs.at(wire_name) = inst->second.name;
+    }
+    else if(mod.outputs.find(wire_name) != mod.outputs.end()){
+      mod.outputs.at(wire_name) = inst->second.name;
+    }
+    else if(mod.stream_wire.find(wire_name) != mod.stream_wire.end()){
+      set_pin_name(mod.stream_wire.at(wire_name), inst->second.name);
+    }
+    else{
+      set_pin_name(mod.dependency_wire.at(wire_name), inst->second.name);
     }
 
     inst->second.pin2wire.insert({pin_name, wire_name});
@@ -530,6 +597,110 @@ inline bool Des::parse_module(const std::filesystem::path &p){
   _modules.insert({mod.name, std::move(mod)});
   return true;
 }
+
+
+// ----------------------------------------------------------------------------------------------- 
+
+
+inline void Des::build_graph(){
+  // Collect lib graphs
+  for(const auto& m: _modules){
+    for(const auto& inst: m.second.instances){
+      if(_modules.find(inst.second.module_name) == _modules.end() and 
+        _libs.find(inst.second.module_name) == _libs.end()){
+        _libs.insert({inst.second.module_name, {}});
+        //for(const auto &iter: inst.second.pin2wire){
+        //  _libs.at(inst.second.module_name).edges.insert(iter.first);
+        //}
+      }
+    }
+  }
+
+  // Recursively build graph for each module
+  for(const auto& m: _modules){
+    if(_graphs.find(m.first) == _graphs.end()){
+      _build_graph(m.first);
+    }
+  }
+}
+
+
+
+template <typename T>
+void prefix_key(std::string prefix, std::unordered_map<std::string, T>& m){
+  for(auto& iter: m){
+    auto nh = m.extract(iter.first);
+    nh.key() = prefix+iter.first;
+    m.insert(move(nh));
+  }
+}
+
+
+inline void Des::_build_graph(const std::string& module_name){
+  _graphs.insert({module_name, {}});
+  auto& g {_graphs.find(module_name)->second};
+  auto& m {_modules.find(module_name)->second};
+
+  // 1. Iterate through the module's instances
+  // 2. For each instance, check it's type ?
+  //      Lib -> get the vertex 
+  //      Module -> has graph ?
+  //                Yes:  
+  //                No:   Recursive build its graph 
+  std::unordered_map<std::string, Graph> subgraphs;
+
+  auto collect_subgraphs {
+    [&](const Instance& inst){ 
+      if(_modules.find(inst.module_name) == _modules.end()){
+        // This is a lib cell 
+        if(g.vertices.find(inst.name) == g.vertices.end()){
+          g.vertices.insert({inst.name, _libs.at(inst.module_name)});
+        }
+      }
+      else{
+        // This is a module
+        if(subgraphs.find(inst.name) == subgraphs.end()){
+          // If the module's graph does not exist, build it recursively 
+          if(_graphs.find(inst.module_name) == _graphs.end()){
+            _build_graph(inst.module_name);
+          }
+          subgraphs.insert({inst.name, _graphs.at(inst.module_name)});
+        }
+      }
+    }
+  };
+
+  for(const auto& kvp: m.inputs){
+    const auto& inst {m.instances.at(kvp.second)};
+    collect_subgraphs(inst);
+    g.pi.emplace(kvp.first);
+  }
+
+  for(const auto& kvp: m.outputs){
+    const auto& inst {m.instances.at(kvp.second)};
+    collect_subgraphs(inst);
+    g.po.emplace(kvp.first);
+  }
+
+  for(const auto& kvp: m.dependency_wire){
+    const auto& [inst1, inst2] = kvp.second;
+    collect_subgraphs(m.instances.at(inst1));
+    collect_subgraphs(m.instances.at(inst2));
+  }
+
+  for(const auto& kvp: m.stream_wire){
+    const auto& [inst1, inst2] = kvp.second;
+    collect_subgraphs(m.instances.at(inst1));
+    collect_subgraphs(m.instances.at(inst2));
+  }
+
+
+  // Iterate through wires to build connection of graph 
+  
+
+}
+
+
 
 };  // end of namespace sda. ----------------------------------------------------------------------
 
