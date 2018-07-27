@@ -90,8 +90,6 @@ class Des{
 
     std::unordered_map<std::string, Vertex> vertices;
     std::unordered_map<std::string, Edge> edges;
-
-    void add_graph(const Graph&);
   };
 
   public:
@@ -101,6 +99,8 @@ class Des{
     const std::unordered_map<std::string, Module>& get_all_modules() const;
 
     void build_graph();
+
+    void dump_graph() const;
 
   private:
 
@@ -123,7 +123,6 @@ class Des{
 
     bool _is_word_valid(std::string_view);
 
-
     void _connect_io(
       Module&, 
       Graph&,
@@ -136,9 +135,32 @@ class Des{
     std::regex _ws_re {"\\s+"};
 };
 
-inline void Des::Graph::add_graph(const Graph& other){
-}
 
+
+inline void Des::dump_graph() const {
+
+  for(const auto& [k, g]: _graphs){
+    std::ostringstream os;
+
+    os << "digraph " << k << " {\n";
+
+    for(const auto& [pin, v]: g.pi){
+      os << pin << " -> " << v << ";\n";
+    }
+
+    for(const auto& [pin, v]: g.po){
+      os << v << " -> " << pin << ";\n";
+    }
+
+    for(const auto& [name, e]: g.edges){
+      os << e.from << " -> " << e.to << " [label=" << name << "]\n";
+    }
+
+    os << "}";
+
+    std::cout << os.str() << "\n\n";
+  }
+}
 
 inline const std::unordered_map<std::string, Des::Module>& Des::get_all_modules() const {
   return _modules;
@@ -197,7 +219,7 @@ inline std::string Des::dump_module(const std::string& module_name) const {
 inline bool Des::_is_word_valid(std::string_view sv){
   static constexpr auto is_char_valid = [](char c){return (std::isalnum(c) or c == '_');};
   return not sv.empty() and std::all_of(sv.begin(), sv.end(), is_char_valid) and 
-         (std::isalpha(sv[0]) or sv[0] == '_');
+    (std::isalpha(sv[0]) or sv[0] == '_');
 }
 
 
@@ -394,7 +416,6 @@ inline bool Des::_parse_cell(std::string_view buf, Module& mod){
   std::string::size_type l_par {0}; 
   std::string::size_type r_par {pos}; 
 
-
   // A lambda to set the pin names of an edge
   auto set_pin_name = [](std::pair<std::string, std::string>& e, std::string& pin){
     if(e.first.empty()){
@@ -437,7 +458,6 @@ inline bool Des::_parse_cell(std::string_view buf, Module& mod){
        mod.outputs.find(wire_name) == mod.outputs.end()){
       return false;
     }
-
 
     if(mod.inputs.find(wire_name) != mod.inputs.end()){
       mod.inputs.at(wire_name) = inst->second.name;
@@ -626,6 +646,7 @@ inline void Des::build_graph(){
     }
   }
 
+
   // Recursively build graph for each module
   for(const auto& m: _modules){
     if(_graphs.find(m.first) == _graphs.end()){
@@ -633,7 +654,6 @@ inline void Des::build_graph(){
     }
   }
 }
-
 
 template <typename T>
 void prefix_key(std::string prefix, std::unordered_map<std::string, T>& m){
@@ -643,7 +663,6 @@ void prefix_key(std::string prefix, std::unordered_map<std::string, T>& m){
     m.insert(move(nh));
   }
 }
-
 
 template <typename T>
 void replace_key(const std::string& old_key, const std::string& new_key, 
@@ -663,35 +682,64 @@ inline void Des::_connect_io(
   std::unordered_map<std::string, Graph>& subgraphs,
   bool direction)
 {
-
   if(g.vertices.find(inst_name) != g.vertices.end()){
+    std::cout << inst_name << " Lib Cell\n";
     // This is a lib cell  
 
     // Add edge to the vertex
-    g.vertices.find(wire_name)->second.edges.emplace(wire_name);
+    //g.vertices.find(wire_name)->second.edges.emplace(wire_name);
+    g.vertices.at(inst_name).edges.emplace(wire_name);
 
     // Add vertex to the egde
-    Edge e;
-    e.from = inst_name;
-    g.edges.insert({wire_name, std::move(e)});
+    if(direction){
+      std::cout << "wire_name = " << wire_name << '\n';
+      g.pi.at(wire_name) = inst_name; //({wire_name, inst_name});
+    }
+    else{
+      g.po.at(wire_name) = inst_name; //g.po.insert({wire_name, inst_name});
+    }
+    //Edge e;
+    //e.from = inst_name;
+    //g.edges.insert({wire_name, std::move(e)});
   }
   else{
+    std::cout << inst_name << " Module Cell\n";
     // This is a module's graph 
     const auto& inst {m.instances.at(inst_name)};   
     const auto& pin {inst.wire2pin.at(wire_name)};
-    auto& inst_g {subgraphs.find(inst_name)->second};
-    auto edge_iter = direction ? inst_g.pi.find(pin) : inst_g.po.find(pin);
-    auto& v {inst_g.vertices.find(edge_iter->second)->second};
+    {
+      //std::cout << inst_name << " " << wire_name << "  " << pin << '\n';
+      //for(auto [q1, q2]: g.pi){
+      //  std::cout << "q = " << q1 << " = " << q2 << '\n';
+      //}
+      //auto edge_iter = direction ? g.pi.find(pin) : g.po.find(pin);
+      auto edge_iter = direction ? g.pi.find(wire_name) : g.po.find(wire_name);
+      if(direction)
+        edge_iter->second = inst_name + _modules.at(inst.module_name).inputs.at(pin);
+      else
+        edge_iter->second = inst_name + _modules.at(inst.module_name).outputs.at(pin);
+      
+      auto& inst_g {subgraphs.at(inst_name)};
+      auto& v {inst_g.vertices.at(direction ? inst_g.pi.at(pin) : inst_g.po.at(pin))};
+      v.edges.erase(pin);
+      v.edges.insert(wire_name);
+    }
 
-    // Update the vertex name in edge 
-    edge_iter->second = inst_name + (direction ? inst_g.pi.at(pin) : inst_g.po.at(pin)); 
+    //{
+    //  auto& inst_g {subgraphs.at(inst_name)};
+    //  auto edge_iter = direction ? inst_g.pi.find(pin) : inst_g.po.find(pin);
+    //  auto& v {inst_g.vertices.at(edge_iter->second)};
 
-    // Update the edge name in vertex
-    v.edges.erase(pin);
-    v.edges.insert(wire_name);
+    //  // Update the vertex name in edge 
+    //  edge_iter->second = inst_name + (direction ? inst_g.pi.at(pin) : inst_g.po.at(pin)); 
 
-    // Update the PI/PO name
-    replace_key<std::string>(pin, wire_name, direction ? inst_g.pi : inst_g.po);
+    //  // Update the edge name in vertex
+    //  v.edges.erase(pin);
+    //  v.edges.insert(wire_name);
+
+    //  // Update the PI/PO name
+    //  replace_key<std::string>(pin, wire_name, direction ? inst_g.pi : inst_g.po);
+    //}
   }
 }
 
@@ -700,6 +748,7 @@ inline void Des::_connect_io(
 
 
 inline void Des::_build_graph(const std::string& module_name){
+  std::cout << "Build Graph ==========> " << module_name << '\n';
   _graphs.insert({module_name, {}});
   auto& g {_graphs.find(module_name)->second};
   auto& m {_modules.find(module_name)->second};
@@ -714,10 +763,10 @@ inline void Des::_build_graph(const std::string& module_name){
 
   auto collect_subgraphs {
     [&](const Instance& inst){ 
-      if(_modules.find(inst.module_name) == _modules.end()){
+      if(_libs.find(inst.module_name) != _libs.end()){
         // This is a tech lib cell 
         if(g.vertices.find(inst.name) == g.vertices.end()){
-          // Insert the tech lib into graph
+          // Insert the vertex of tech lib into graph
           g.vertices.insert({inst.name, _libs.at(inst.module_name)});
         }
       }
@@ -746,6 +795,7 @@ inline void Des::_build_graph(const std::string& module_name){
     g.po.insert({kvp.first.data(), {}});
   }
 
+
   for(const auto& kvp: m.dependency_wire){
     const auto& [inst1, inst2] = kvp.second;
     collect_subgraphs(m.instances.at(inst1));
@@ -758,9 +808,13 @@ inline void Des::_build_graph(const std::string& module_name){
     collect_subgraphs(m.instances.at(inst2));
   }
 
+
+  std::cout << "Start building " << module_name << '\n';
+
   //------------------ Iterate through wires to build connection of graph  ------------------------
 
-  // Handle primary outputs
+
+  // Handle primary inputs
   for(const auto& kvp: m.inputs){
     _connect_io(m, g, kvp.first.data(), kvp.second, subgraphs, true);    
   } 
@@ -770,6 +824,9 @@ inline void Des::_build_graph(const std::string& module_name){
     _connect_io(m, g, kvp.first.data(), kvp.second, subgraphs, false);    
   } 
 
+
+  std::cout << "Module name = " << m.name << " : " << m.dependency_wire.size() << '\n';
+
   // Handle dependency wire
   for(const auto& [wire_name, inst_pair]: m.dependency_wire){
     const auto& inst1 {m.instances.at(std::get<0>(inst_pair))};
@@ -777,87 +834,128 @@ inline void Des::_build_graph(const std::string& module_name){
 
     auto edge_iter = std::get<0>(g.edges.insert({wire_name, {}}));
 
+    std::cout << "inst1 : " << inst1.module_name << '\n';
+    std::cout << "inst2 : " << inst2.module_name << '\n';
+
     // Handle inst1
-    if(_modules.find(inst1.module_name) == _modules.end()){
+    if(_libs.find(inst1.module_name) != _libs.end()){
       // A tech lib 
       edge_iter->second.from = std::get<0>(inst_pair);
       g.vertices.at(std::get<0>(inst_pair)).edges.emplace(wire_name);
     }
     else{
       // A module's graph  
-      {
-        auto& pin {m.instances.at(std::get<0>(inst_pair)).wire2pin.at(wire_name)};
-        auto& inst_g = subgraphs.at(std::get<0>(inst_pair));
+      auto& pin {m.instances.at(std::get<0>(inst_pair)).wire2pin.at(wire_name)};
+      auto& inst_g {subgraphs.at(std::get<0>(inst_pair))};
 
-        if(_modules.at(inst1.module_name).inputs.find(pin) != 
-            _modules.at(inst1.module_name).inputs.end()){
-          // This is the input of the instance 
 
-          // Update the vertex name in edge 
-          edge_iter->second.from = std::get<0>(inst_pair) + 
-            _modules.at(inst1.module_name).inputs.at(pin);
+      if(_modules.at(inst1.module_name).inputs.find(pin) != 
+         _modules.at(inst1.module_name).inputs.end()){
+        // This is the input of the instance 
 
-          // Update the edge name in pi
-          replace_key<std::string>(pin, edge_iter->first, inst_g.pi); 
+        // Update the vertex name in edge 
+        edge_iter->second.from = std::get<0>(inst_pair) + 
+          _modules.at(inst1.module_name).inputs.at(pin);
 
-          // Update the edge name in vertex
-          inst_g.vertices.at(_modules.at(inst1.module_name).inputs.at(pin)).edges.erase(pin); 
-          inst_g.vertices.at(_modules.at(inst1.module_name).inputs.at(pin)).edges.emplace(edge_iter->first);
-        }
-        else{
-          edge_iter->second.to = std::get<0>(inst_pair) + 
-            _modules.at(inst1.module_name).outputs.at(pin);
+        // Update the edge name in pi
+        replace_key<std::string>(pin, wire_name, inst_g.pi); 
 
-          replace_key<std::string>(pin, edge_iter->first, inst_g.po);
-
-          inst_g.vertices.at(_modules.at(inst1.module_name).outputs.at(pin)).edges.erase(pin); 
-          inst_g.vertices.at(_modules.at(inst1.module_name).outputs.at(pin)).edges.emplace(edge_iter->first);
-        }
+        // Update the edge name in vertex
+        inst_g.vertices.at(_modules.at(inst1.module_name).inputs.at(pin)).edges.erase(pin); 
+        inst_g.vertices.at(_modules.at(inst1.module_name).inputs.at(pin)).edges.emplace(wire_name);
       }
+      else{
+        edge_iter->second.to = std::get<0>(inst_pair) + 
+          _modules.at(inst1.module_name).outputs.at(pin);
 
+        replace_key<std::string>(pin, wire_name, inst_g.po);
 
-      {
-        auto& pin {m.instances.at(std::get<1>(inst_pair)).wire2pin.at(wire_name)};
-        auto& inst_g = subgraphs.at(std::get<1>(inst_pair));
-
-        if(_modules.at(inst2.module_name).inputs.find(pin) != 
-            _modules.at(inst2.module_name).inputs.end()){
-          // This is the input of the instance 
-
-          // Update the vertex name in edge 
-          edge_iter->second.from = std::get<1>(inst_pair) + 
-            _modules.at(inst2.module_name).inputs.at(pin);
-
-          // Update the edge name in pi
-          replace_key<std::string>(pin, edge_iter->first, inst_g.pi); 
-
-          // Update the edge name in vertex
-          inst_g.vertices.at(_modules.at(inst2.module_name).inputs.at(pin)).edges.erase(pin); 
-          inst_g.vertices.at(_modules.at(inst2.module_name).inputs.at(pin)).edges.emplace(edge_iter->first);
-        }
-        else{
-          edge_iter->second.to = std::get<1>(inst_pair) + 
-            _modules.at(inst2.module_name).outputs.at(pin);
-
-          replace_key<std::string>(pin, edge_iter->first, inst_g.po);
-
-          inst_g.vertices.at(_modules.at(inst2.module_name).outputs.at(pin)).edges.erase(pin); 
-          inst_g.vertices.at(_modules.at(inst2.module_name).outputs.at(pin)).edges.emplace(edge_iter->first);
-        }
+        inst_g.vertices.at(_modules.at(inst1.module_name).outputs.at(pin)).edges.erase(pin); 
+        inst_g.vertices.at(_modules.at(inst1.module_name).outputs.at(pin)).edges.emplace(wire_name);
       }
+    }
 
+    // Handle inst2
+    if(_libs.find(inst2.module_name) != _libs.end()){
+      // A tech lib 
+      if(edge_iter->second.to.empty()){
+        edge_iter->second.to = std::get<1>(inst_pair);
+      }
+      else{
+        edge_iter->second.from = std::get<1>(inst_pair);
+      }
+      g.vertices.at(std::get<0>(inst_pair)).edges.emplace(wire_name);
+    }
+    else{
+      auto& pin {m.instances.at(std::get<1>(inst_pair)).wire2pin.at(wire_name)};
+      auto& inst_g = subgraphs.at(std::get<1>(inst_pair));
+
+      if(_modules.at(inst2.module_name).inputs.find(pin) != 
+         _modules.at(inst2.module_name).inputs.end()){
+        // This is the input of the instance 
+
+        // Update the vertex name in edge 
+        edge_iter->second.from = std::get<1>(inst_pair) + 
+          _modules.at(inst2.module_name).inputs.at(pin);
+
+        // Update the edge name in pi
+        replace_key<std::string>(pin, wire_name, inst_g.pi); 
+
+        // Update the edge name in vertex
+        inst_g.vertices.at(_modules.at(inst2.module_name).inputs.at(pin)).edges.erase(pin); 
+        inst_g.vertices.at(_modules.at(inst2.module_name).inputs.at(pin)).edges.emplace(wire_name);
+      }
+      else{
+        edge_iter->second.to = std::get<1>(inst_pair) + 
+          _modules.at(inst2.module_name).outputs.at(pin);
+
+        replace_key<std::string>(pin, wire_name, inst_g.po);
+
+        inst_g.vertices.at(_modules.at(inst2.module_name).outputs.at(pin)).edges.erase(pin); 
+        inst_g.vertices.at(_modules.at(inst2.module_name).outputs.at(pin)).edges.emplace(wire_name);
+      }
     }
   } 
 
-
-  // Flattern graphs ------------------------------------------------------------------------------ 
+  // Flattern graphs ------------------------------------------------------------------------------   
   for(auto &inst: m.instances){
-    auto& sg {subgraphs.at(inst.first)};
-    prefix_key<Vertex>(inst.first, sg.vertices);
-    prefix_key<Edge>(inst.first, sg.edges);
-    g.vertices.merge(std::move(sg.vertices));
-    g.edges.merge(std::move(sg.edges));
+    if(subgraphs.find(inst.first) != subgraphs.end()){
+      auto& sg {subgraphs.at(inst.first)};
+      for(auto &[k, v]: sg.vertices){
+        g.vertices.insert({inst.first+k, std::move(v)});
+      }
+      for(auto &[k, e]: sg.edges){
+        e.from.insert(0, inst.first);
+        e.to.insert(0, inst.first);
+        g.edges.insert({inst.first+k, std::move(e)});
+      }
+    }
   }
+
+
+
+  std::cout << "\n\nGraph Info : \n";
+  for(const auto& [k, v]: g.pi){
+    std::cout << "PI : " << k << " / " << v << '\n';
+  }
+  for(const auto& [k, v]: g.po){
+    std::cout << "PI : " << k << " / " << v << '\n';
+  }
+  for(const auto& [k, v]: g.vertices){
+    std::cout << "Vertex = " << k << '\n';
+  }
+  for(const auto& [k, v]: g.edges){
+    std::cout << "Edge = " << k << '\n';
+  }
+  std::cout << "\n-------------------------------\n\n";
+
+  //for(auto &inst: m.instances){
+  //  auto& sg {subgraphs.at(inst.first)};
+  //  prefix_key<Vertex>(inst.first, sg.vertices);
+  //  prefix_key<Edge>(inst.first, sg.edges);
+  //  g.vertices.merge(std::move(sg.vertices));
+  //  g.edges.merge(std::move(sg.edges));
+  //}
 
 }
 };  // end of namespace sda. ----------------------------------------------------------------------
