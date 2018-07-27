@@ -635,6 +635,14 @@ inline void Des::build_graph(){
 }
 
 
+template <typename T>
+void prefix_key(std::string prefix, std::unordered_map<std::string, T>& m){
+  for(auto& iter: m){
+    auto nh = m.extract(iter.first);
+    nh.key() = prefix+iter.first;
+    m.insert(move(nh));
+  }
+}
 
 
 template <typename T>
@@ -750,15 +758,19 @@ inline void Des::_build_graph(const std::string& module_name){
     collect_subgraphs(m.instances.at(inst2));
   }
 
-  // Iterate through wires to build connection of graph 
+  //------------------ Iterate through wires to build connection of graph  ------------------------
+
+  // Handle primary outputs
   for(const auto& kvp: m.inputs){
     _connect_io(m, g, kvp.first.data(), kvp.second, subgraphs, true);    
   } 
 
+  // Handle primary inputs
   for(const auto& kvp: m.outputs){
     _connect_io(m, g, kvp.first.data(), kvp.second, subgraphs, false);    
   } 
 
+  // Handle dependency wire
   for(const auto& [wire_name, inst_pair]: m.dependency_wire){
     const auto& inst1 {m.instances.at(std::get<0>(inst_pair))};
     const auto& inst2 {m.instances.at(std::get<1>(inst_pair))};
@@ -769,7 +781,7 @@ inline void Des::_build_graph(const std::string& module_name){
     if(_modules.find(inst1.module_name) == _modules.end()){
       // A tech lib 
       edge_iter->second.from = std::get<0>(inst_pair);
-      g.vertices.find(std::get<0>(inst_pair))->second.edges.emplace(wire_name);
+      g.vertices.at(std::get<0>(inst_pair)).edges.emplace(wire_name);
     }
     else{
       // A module's graph  
@@ -837,10 +849,17 @@ inline void Des::_build_graph(const std::string& module_name){
     }
   } 
 
+
+  // Flattern graphs ------------------------------------------------------------------------------ 
+  for(auto &inst: m.instances){
+    auto& sg {subgraphs.at(inst.first)};
+    prefix_key<Vertex>(inst.first, sg.vertices);
+    prefix_key<Edge>(inst.first, sg.edges);
+    g.vertices.merge(std::move(sg.vertices));
+    g.edges.merge(std::move(sg.edges));
+  }
+
 }
-
-
-
 };  // end of namespace sda. ----------------------------------------------------------------------
 
 
