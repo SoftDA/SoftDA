@@ -891,7 +891,7 @@ inline void Des::_build_graph(const std::string& module_name){
       else{
         edge_iter->second.from = std::get<1>(inst_pair);
       }
-      g.vertices.at(std::get<0>(inst_pair)).edges.emplace(wire_name);
+      g.vertices.at(std::get<1>(inst_pair)).edges.emplace(wire_name);
     }
     else{
       auto& pin {m.instances.at(std::get<1>(inst_pair)).wire2pin.at(wire_name)};
