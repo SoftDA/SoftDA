@@ -101,6 +101,8 @@ class Des{
     void build_graph();
 
     void dump_graph() const;
+    
+    void check_graph() const;
 
   private:
 
@@ -135,6 +137,28 @@ class Des{
     std::regex _ws_re {"\\s+"};
 };
 
+
+inline void Des::check_graph() const {
+  for(const auto& [k, g]: _graphs){
+    for(const auto& [name, e]: g.edges){
+      if(!e.from.empty()){
+        assert(g.vertices.find(e.from) != g.vertices.end());
+      }
+      if(!e.to.empty()){
+        assert(g.vertices.find(e.to) != g.vertices.end());
+      }
+    }
+    for(const auto& [name, v]: g.vertices){
+      for(const auto& e: v.edges){
+        if(g.pi.find(e) == g.pi.end() and g.po.find(e) == g.po.end() and
+          g.edges.find(e) == g.edges.end()){
+          std::cout << "No such edge : " << name << " e = " << e << '\n';
+          assert(false);
+        }
+      }
+    }  
+  }
+}
 
 
 inline void Des::dump_graph() const {
@@ -968,14 +992,6 @@ inline void Des::_build_graph(const std::string& module_name){
     std::cout << "Edge = " << k << "  from: " << e.from << " to: " << e.to << '\n';
   }
   std::cout << "\n-------------------------------\n\n";
-
-  //for(auto &inst: m.instances){
-  //  auto& sg {subgraphs.at(inst.first)};
-  //  prefix_key<Vertex>(inst.first, sg.vertices);
-  //  prefix_key<Edge>(inst.first, sg.edges);
-  //  g.vertices.merge(std::move(sg.vertices));
-  //  g.edges.merge(std::move(sg.edges));
-  //}
 
 }
 };  // end of namespace sda. ----------------------------------------------------------------------
