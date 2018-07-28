@@ -712,15 +712,25 @@ inline void Des::_connect_io(
       //for(auto [q1, q2]: g.pi){
       //  std::cout << "q = " << q1 << " = " << q2 << '\n';
       //}
-      //auto edge_iter = direction ? g.pi.find(pin) : g.po.find(pin);
+      //auto edge_iter = direction ? g.pi.find(pin) : g.po.find(pin); 
+
+
       auto edge_iter = direction ? g.pi.find(wire_name) : g.po.find(wire_name);
-      if(direction)
-        edge_iter->second = inst_name + _modules.at(inst.module_name).inputs.at(pin);
-      else
-        edge_iter->second = inst_name + _modules.at(inst.module_name).outputs.at(pin);
-      
+
       auto& inst_g {subgraphs.at(inst_name)};
       auto& v {inst_g.vertices.at(direction ? inst_g.pi.at(pin) : inst_g.po.at(pin))};
+
+      if(direction){
+        //edge_iter->second = inst_name + _modules.at(inst.module_name).inputs.at(pin);
+        edge_iter->second = inst_name + inst_g.pi.at(pin);
+        //_modules.at(inst.module_name).inputs.at(pin);
+      }
+      else{
+        //edge_iter->second = inst_name + _modules.at(inst.module_name).outputs.at(pin); 
+        edge_iter->second = inst_name + inst_g.po.at(pin);
+      }
+      std::cout << "edge_iter second => " << edge_iter->second << '\n';
+      
       v.edges.erase(pin);
       v.edges.insert(wire_name);
     }
@@ -815,13 +825,13 @@ inline void Des::_build_graph(const std::string& module_name){
 
 
   // Handle primary inputs
-  for(const auto& kvp: m.inputs){
-    _connect_io(m, g, kvp.first.data(), kvp.second, subgraphs, true);    
+  for(const auto& [port_name, inst_name]: m.inputs){
+    _connect_io(m, g, port_name.data(), inst_name, subgraphs, true);    
   } 
 
   // Handle primary inputs
-  for(const auto& kvp: m.outputs){
-    _connect_io(m, g, kvp.first.data(), kvp.second, subgraphs, false);    
+  for(const auto& [port_name, inst_name]: m.outputs){
+    _connect_io(m, g, port_name.data(), inst_name, subgraphs, false);    
   } 
 
 
@@ -920,11 +930,25 @@ inline void Des::_build_graph(const std::string& module_name){
   // Flattern graphs ------------------------------------------------------------------------------   
   for(auto &inst: m.instances){
     if(subgraphs.find(inst.first) != subgraphs.end()){
+      // This is a module's graph
       auto& sg {subgraphs.at(inst.first)};
       for(auto &[k, v]: sg.vertices){
-        g.vertices.insert({inst.first+k, std::move(v)});
+        auto new_v = v;
+        new_v.edges.clear();
+        for(const auto&e : v.edges){
+          if(m.inputs.find(e) == m.inputs.end() and m.outputs.find(e) == m.outputs.end()){
+            new_v.edges.insert(inst.first+e);
+          }
+          else{
+            new_v.edges.insert(e);
+          }
+          //std::cout << "before = " << e <<  "  after = " << inst.first + e << '\n';
+        }
+        g.vertices.insert({inst.first+k, std::move(new_v)});
+        //g.vertices.insert({inst.first+k, std::move(v)});
       }
       for(auto &[k, e]: sg.edges){
+        // Update the vertices in edge
         e.from.insert(0, inst.first);
         e.to.insert(0, inst.first);
         g.edges.insert({inst.first+k, std::move(e)});
@@ -944,8 +968,8 @@ inline void Des::_build_graph(const std::string& module_name){
   for(const auto& [k, v]: g.vertices){
     std::cout << "Vertex = " << k << '\n';
   }
-  for(const auto& [k, v]: g.edges){
-    std::cout << "Edge = " << k << '\n';
+  for(const auto& [k, e]: g.edges){
+    std::cout << "Edge = " << k << "  from: " << e.from << " to: " << e.to << '\n';
   }
   std::cout << "\n-------------------------------\n\n";
 
