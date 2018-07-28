@@ -193,11 +193,11 @@ inline std::string Des::dump_module(const std::string& module_name) const {
   }
 
   for(const auto& p: m.dependency_wire){
-    str.append("wire ").append(p.first).append("dependency;\n");
+    str.append("wire ").append(p.first).append(" dependency;\n");
   }
 
   for(const auto& p: m.stream_wire){
-    str.append("wire ").append(p.first).append("stream;\n");
+    str.append("wire ").append(p.first).append(" stream;\n");
   }
 
   for(const auto&[k ,v]: m.instances){
@@ -858,7 +858,6 @@ inline void Des::_build_graph(const std::string& module_name){
       auto& pin {m.instances.at(std::get<0>(inst_pair)).wire2pin.at(wire_name)};
       auto& inst_g {subgraphs.at(std::get<0>(inst_pair))};
 
-
       if(_modules.at(inst1.module_name).inputs.find(pin) != 
          _modules.at(inst1.module_name).inputs.end()){
         // This is the input of the instance 
@@ -958,7 +957,7 @@ inline void Des::_build_graph(const std::string& module_name){
 
 
 
-  std::cout << "\n\nGraph Info : \n";
+  std::cout << "\n\nGraph Info " << module_name << " : \n";
   for(const auto& [k, v]: g.pi){
     std::cout << "PI : " << k << " / " << v << '\n';
   }
