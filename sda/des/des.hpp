@@ -683,7 +683,7 @@ template <typename T>
 void prefix_key(std::string prefix, std::unordered_map<std::string, T>& m){
   for(auto& iter: m){
     auto nh = m.extract(iter.first);
-    nh.key() = prefix+iter.first;
+    nh.key() = prefix+ "-" + iter.first;
     m.insert(move(nh));
   }
 }
@@ -816,16 +816,16 @@ inline void Des::_build_graph(const std::string& module_name){
     }
   };
 
-  for(const auto& kvp: m.inputs){
-    const auto& inst {m.instances.at(kvp.second)};
+  for(const auto& [port_name, inst_name]: m.inputs){
+    const auto& inst {m.instances.at(inst_name)};
     collect_subgraphs(inst);
-    g.pi.insert({kvp.first.data(), {}});
+    g.pi.insert({port_name.data(), {}});
   }
 
-  for(const auto& kvp: m.outputs){
-    const auto& inst {m.instances.at(kvp.second)};
+  for(const auto& [port_name, inst_name]: m.outputs){
+    const auto& inst {m.instances.at(inst_name)};
     collect_subgraphs(inst);
-    g.po.insert({kvp.first.data(), {}});
+    g.po.insert({port_name.data(), {}});
   }
 
 
@@ -846,7 +846,6 @@ inline void Des::_build_graph(const std::string& module_name){
 
   //------------------ Iterate through wires to build connection of graph  ------------------------
 
-
   // Handle primary inputs
   for(const auto& [port_name, inst_name]: m.inputs){
     _connect_io(m, g, port_name.data(), inst_name, subgraphs, true);    
@@ -856,7 +855,6 @@ inline void Des::_build_graph(const std::string& module_name){
   for(const auto& [port_name, inst_name]: m.outputs){
     _connect_io(m, g, port_name.data(), inst_name, subgraphs, false);    
   } 
-
 
   std::cout << "Module name = " << m.name << " : " << m.dependency_wire.size() << '\n';
 
@@ -965,7 +963,6 @@ inline void Des::_build_graph(const std::string& module_name){
           }
         }
         g.vertices.insert({inst.first+k, std::move(new_v)});
-        //g.vertices.insert({inst.first+k, std::move(v)});
       }
       for(auto &[k, e]: inst_g.edges){
         // Update the vertices in edge
