@@ -714,7 +714,6 @@ inline void Des::_connect_io(
       //}
       //auto edge_iter = direction ? g.pi.find(pin) : g.po.find(pin); 
 
-
       auto edge_iter = direction ? g.pi.find(wire_name) : g.po.find(wire_name);
 
       auto& inst_g {subgraphs.at(inst_name)};
@@ -926,23 +925,25 @@ inline void Des::_build_graph(const std::string& module_name){
   for(auto &inst: m.instances){
     if(subgraphs.find(inst.first) != subgraphs.end()){
       // This is a module's graph
-      auto& sg {subgraphs.at(inst.first)};
-      for(auto &[k, v]: sg.vertices){
+      auto& inst_g {subgraphs.at(inst.first)};
+      for(auto &[k, v]: inst_g.vertices){
         auto new_v = v;
         new_v.edges.clear();
         for(const auto&e : v.edges){
-          if(m.inputs.find(e) == m.inputs.end() and m.outputs.find(e) == m.outputs.end()){
+          if(inst_g.pi.find(e) == inst_g.pi.end() and 
+            inst_g.po.find(e) == inst_g.po.end() and 
+            g.pi.find(e) == g.pi.end() and 
+            g.po.find(e) == g.po.end() ){
             new_v.edges.insert(inst.first+e);
           }
           else{
             new_v.edges.insert(e);
           }
-          //std::cout << "before = " << e <<  "  after = " << inst.first + e << '\n';
         }
         g.vertices.insert({inst.first+k, std::move(new_v)});
         //g.vertices.insert({inst.first+k, std::move(v)});
       }
-      for(auto &[k, e]: sg.edges){
+      for(auto &[k, e]: inst_g.edges){
         // Update the vertices in edge
         e.from.insert(0, inst.first);
         e.to.insert(0, inst.first);
