@@ -863,24 +863,22 @@ inline void Des::_build_graph(const std::string& module_name){
         // This is the input of the instance 
 
         // Update the vertex name in edge 
-        edge_iter->second.from = std::get<0>(inst_pair) + 
-          _modules.at(inst1.module_name).inputs.at(pin);
+        edge_iter->second.to = std::get<0>(inst_pair) + inst_g.pi.at(pin);
+
+        // Update the edge name in vertex
+        inst_g.vertices.at(inst_g.pi.at(pin)).edges.erase(pin); 
+        inst_g.vertices.at(inst_g.pi.at(pin)).edges.emplace(wire_name);
 
         // Update the edge name in pi
         replace_key<std::string>(pin, wire_name, inst_g.pi); 
-
-        // Update the edge name in vertex
-        inst_g.vertices.at(_modules.at(inst1.module_name).inputs.at(pin)).edges.erase(pin); 
-        inst_g.vertices.at(_modules.at(inst1.module_name).inputs.at(pin)).edges.emplace(wire_name);
       }
       else{
-        edge_iter->second.to = std::get<0>(inst_pair) + 
-          _modules.at(inst1.module_name).outputs.at(pin);
+        edge_iter->second.from = std::get<0>(inst_pair) + inst_g.po.at(pin);
+
+        inst_g.vertices.at(inst_g.po.at(pin)).edges.erase(pin); 
+        inst_g.vertices.at(inst_g.po.at(pin)).edges.emplace(wire_name);
 
         replace_key<std::string>(pin, wire_name, inst_g.po);
-
-        inst_g.vertices.at(_modules.at(inst1.module_name).outputs.at(pin)).edges.erase(pin); 
-        inst_g.vertices.at(_modules.at(inst1.module_name).outputs.at(pin)).edges.emplace(wire_name);
       }
     }
 
@@ -904,24 +902,22 @@ inline void Des::_build_graph(const std::string& module_name){
         // This is the input of the instance 
 
         // Update the vertex name in edge 
-        edge_iter->second.from = std::get<1>(inst_pair) + 
-          _modules.at(inst2.module_name).inputs.at(pin);
+        edge_iter->second.to = std::get<1>(inst_pair) + inst_g.pi.at(pin);
+
+        // Update the edge name in vertex
+        inst_g.vertices.at(inst_g.pi.at(pin)).edges.erase(pin); 
+        inst_g.vertices.at(inst_g.pi.at(pin)).edges.emplace(wire_name);
 
         // Update the edge name in pi
         replace_key<std::string>(pin, wire_name, inst_g.pi); 
-
-        // Update the edge name in vertex
-        inst_g.vertices.at(_modules.at(inst2.module_name).inputs.at(pin)).edges.erase(pin); 
-        inst_g.vertices.at(_modules.at(inst2.module_name).inputs.at(pin)).edges.emplace(wire_name);
       }
       else{
-        edge_iter->second.to = std::get<1>(inst_pair) + 
-          _modules.at(inst2.module_name).outputs.at(pin);
+        edge_iter->second.from = std::get<1>(inst_pair) + inst_g.po.at(pin);
+
+        inst_g.vertices.at(inst_g.po.at(pin)).edges.erase(pin); 
+        inst_g.vertices.at(inst_g.po.at(pin)).edges.emplace(wire_name);
 
         replace_key<std::string>(pin, wire_name, inst_g.po);
-
-        inst_g.vertices.at(_modules.at(inst2.module_name).outputs.at(pin)).edges.erase(pin); 
-        inst_g.vertices.at(_modules.at(inst2.module_name).outputs.at(pin)).edges.emplace(wire_name);
       }
     }
   } 
