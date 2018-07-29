@@ -106,8 +106,8 @@ class Des{
 
   private:
 
-    std::unordered_map<std::string_view, Vertex> _libs;
-    std::unordered_map<std::string_view, Graph> _graphs;
+    std::unordered_map<std::string, Vertex> _libs;
+    std::unordered_map<std::string, Graph> _graphs;
     void _build_graph(const std::string&);
 
     std::unordered_map<std::string, Module> _modules;
@@ -123,7 +123,7 @@ class Des{
 
     std::vector<std::string> _split_on_space(std::string&);
 
-    bool _is_word_valid(std::string_view);
+    bool _is_word_valid(std::string_view) const;
 
     void _connect_io(
       Module&, 
@@ -162,6 +162,8 @@ inline void Des::check_graph() const {
 
 
 inline void Des::dump_graph() const {
+   
+  const std::string edge (" -> ");
 
   for(const auto& [k, g]: _graphs){
     std::ostringstream os;
@@ -240,7 +242,7 @@ inline std::string Des::dump_module(const std::string& module_name) const {
 // Function: _is_word_valid 
 // Check the chars must be either alphabets or digits or underscore
 // and the first char must be an alphabet or underscore.
-inline bool Des::_is_word_valid(std::string_view sv){
+inline bool Des::_is_word_valid(std::string_view sv) const {
   static constexpr auto is_char_valid = [](char c){return (std::isalnum(c) or c == '_');};
   return not sv.empty() and std::all_of(sv.begin(), sv.end(), is_char_valid) and 
     (std::isalpha(sv[0]) or sv[0] == '_');
@@ -716,7 +718,6 @@ inline void Des::_connect_io(
 
     // Add vertex to the egde
     if(direction){
-      std::cout << "wire_name = " << wire_name << '\n';
       g.pi.at(wire_name) = inst_name; //({wire_name, inst_name});
     }
     else{
@@ -891,7 +892,7 @@ inline void Des::_build_graph(const std::string& module_name){
         inst_g.vertices.at(inst_g.pi.at(pin)).edges.emplace(wire_name);
 
         // Update the edge name in pi
-        replace_key<std::string>(pin, wire_name, inst_g.pi); 
+        replace_key(pin, wire_name, inst_g.pi); 
       }
       else{
         edge_iter->second.from = std::get<0>(inst_pair) + inst_g.po.at(pin);
@@ -899,7 +900,7 @@ inline void Des::_build_graph(const std::string& module_name){
         inst_g.vertices.at(inst_g.po.at(pin)).edges.erase(pin); 
         inst_g.vertices.at(inst_g.po.at(pin)).edges.emplace(wire_name);
 
-        replace_key<std::string>(pin, wire_name, inst_g.po);
+        replace_key(pin, wire_name, inst_g.po);
       }
     }
 
@@ -916,7 +917,7 @@ inline void Des::_build_graph(const std::string& module_name){
     }
     else{
       auto& pin {m.instances.at(std::get<1>(inst_pair)).wire2pin.at(wire_name)};
-      auto& inst_g = subgraphs.at(std::get<1>(inst_pair));
+      auto& inst_g {subgraphs.at(std::get<1>(inst_pair))};
 
       if(_modules.at(inst2.module_name).inputs.find(pin) != 
          _modules.at(inst2.module_name).inputs.end()){
@@ -993,6 +994,4 @@ inline void Des::_build_graph(const std::string& module_name){
 }
 };  // end of namespace sda. ----------------------------------------------------------------------
 
-
 #endif
-
