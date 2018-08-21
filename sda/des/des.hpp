@@ -578,6 +578,7 @@ inline bool Des::_next_valid_char(std::string_view buf, size_t& pos){
 
 inline bool Des::parse_module(const std::filesystem::path &p){
   if(not std::filesystem::exists(p)){
+    std::cerr << "path not exists " << p << '\n';
     return false;
   }
 
@@ -665,9 +666,6 @@ inline void Des::build_graph(){
       if(_modules.find(inst.second.module_name) == _modules.end() and 
         _libs.find(inst.second.module_name) == _libs.end()){
         _libs.insert({inst.second.module_name, {}});
-        //for(const auto &iter: inst.second.pin2wire){
-        //  _libs.at(inst.second.module_name).edges.insert(iter.first);
-        //}
       }
     }
   }
@@ -709,11 +707,10 @@ inline void Des::_connect_io(
   bool direction)
 {
   if(g.vertices.find(inst_name) != g.vertices.end()){
-    std::cout << inst_name << " Lib Cell\n";
+    //std::cout << inst_name << " Lib Cell\n";
     // This is a lib cell  
 
     // Add edge to the vertex
-    //g.vertices.find(wire_name)->second.edges.emplace(wire_name);
     g.vertices.at(inst_name).edges.emplace(wire_name);
 
     // Add vertex to the egde
@@ -733,12 +730,6 @@ inline void Des::_connect_io(
     const auto& inst {m.instances.at(inst_name)};   
     const auto& pin {inst.wire2pin.at(wire_name)};
     {
-      //std::cout << inst_name << " " << wire_name << "  " << pin << '\n';
-      //for(auto [q1, q2]: g.pi){
-      //  std::cout << "q = " << q1 << " = " << q2 << '\n';
-      //}
-      //auto edge_iter = direction ? g.pi.find(pin) : g.po.find(pin); 
-
       auto edge_iter = direction ? g.pi.find(wire_name) : g.po.find(wire_name);
 
       auto& inst_g {subgraphs.at(inst_name)};
@@ -753,23 +744,12 @@ inline void Des::_connect_io(
         //edge_iter->second = inst_name + _modules.at(inst.module_name).outputs.at(pin); 
         edge_iter->second = inst_name + inst_g.po.at(pin);
       }
-      std::cout << "edge_iter second => " << edge_iter->second << '\n';
+      //std::cout << "edge_iter second => " << edge_iter->second << '\n';
       
       v.edges.erase(pin);
       v.edges.insert(wire_name);
     }
 
-    //{
-    //  auto& inst_g {subgraphs.at(inst_name)};
-    //  auto edge_iter = direction ? inst_g.pi.find(pin) : inst_g.po.find(pin);
-    //  auto& v {inst_g.vertices.at(edge_iter->second)};
-
-    //  // Update the vertex name in edge 
-    //  edge_iter->second = inst_name + (direction ? inst_g.pi.at(pin) : inst_g.po.at(pin)); 
-
-    //  // Update the edge name in vertex
-    //  v.edges.erase(pin);
-    //  v.edges.insert(wire_name);
 
     //  // Update the PI/PO name
     //  replace_key<std::string>(pin, wire_name, direction ? inst_g.pi : inst_g.po);
@@ -843,7 +823,7 @@ inline void Des::_build_graph(const std::string& module_name){
   }
 
 
-  std::cout << "Start building " << module_name << '\n';
+  //std::cout << "Start building " << module_name << '\n';
 
   //------------------ Iterate through wires to build connection of graph  ------------------------
 
@@ -857,7 +837,6 @@ inline void Des::_build_graph(const std::string& module_name){
     _connect_io(m, g, port_name.data(), inst_name, subgraphs, false);    
   } 
 
-  std::cout << "Module name = " << m.name << " : " << m.dependency_wire.size() << '\n';
 
   // Handle dependency wire
   for(const auto& [wire_name, inst_pair]: m.dependency_wire){
