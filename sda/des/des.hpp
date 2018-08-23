@@ -106,6 +106,8 @@ class Des{
 
   private:
 
+    const char _divider {'/'};
+
     std::unordered_map<std::string, Vertex> _libs;
     std::unordered_map<std::string, Graph> _graphs;
     void _build_graph(const std::string&);
@@ -171,15 +173,15 @@ inline void Des::dump_graph() const {
     os << "digraph " << k << " {\n";
 
     for(const auto& [pin, v]: g.pi){
-      os << pin << " -> " << v << ";\n";
+      os << '"' << pin << '"' << " -> " << '"' << v << '"' << ";\n";
     }
 
     for(const auto& [pin, v]: g.po){
-      os << v << " -> " << pin << ";\n";
+      os << '"' << v << '"' << " -> " << '"' << pin << '"' << ";\n";
     }
 
     for(const auto& [name, e]: g.edges){
-      os << e.from << " -> " << e.to << " [label=" << name << "]\n";
+      os << '"' << e.from << '"' << " -> " << '"' << e.to << '"' << " [label=" << '"' << name << '"' << "]\n";
     }
 
     os << "}";
@@ -670,7 +672,6 @@ inline void Des::build_graph(){
     }
   }
 
-
   // Recursively build graph for each module
   for(const auto& m: _modules){
     if(_graphs.find(m.first) == _graphs.end()){
@@ -737,12 +738,12 @@ inline void Des::_connect_io(
 
       if(direction){
         //edge_iter->second = inst_name + _modules.at(inst.module_name).inputs.at(pin);
-        edge_iter->second = inst_name + inst_g.pi.at(pin);
+        edge_iter->second = inst_name + _divider + inst_g.pi.at(pin);
         //_modules.at(inst.module_name).inputs.at(pin);
       }
       else{
         //edge_iter->second = inst_name + _modules.at(inst.module_name).outputs.at(pin); 
-        edge_iter->second = inst_name + inst_g.po.at(pin);
+        edge_iter->second = inst_name + _divider + inst_g.po.at(pin);
       }
       //std::cout << "edge_iter second => " << edge_iter->second << '\n';
       
@@ -864,7 +865,7 @@ inline void Des::_build_graph(const std::string& module_name){
         // This is the input of the instance 
 
         // Update the vertex name in edge 
-        edge_iter->second.to = std::get<0>(inst_pair) + inst_g.pi.at(pin);
+        edge_iter->second.to = std::get<0>(inst_pair) + _divider + inst_g.pi.at(pin);
 
         // Update the edge name in vertex
         inst_g.vertices.at(inst_g.pi.at(pin)).edges.erase(pin); 
@@ -874,7 +875,7 @@ inline void Des::_build_graph(const std::string& module_name){
         replace_key(pin, wire_name, inst_g.pi); 
       }
       else{
-        edge_iter->second.from = std::get<0>(inst_pair) + inst_g.po.at(pin);
+        edge_iter->second.from = std::get<0>(inst_pair) + _divider + inst_g.po.at(pin);
 
         inst_g.vertices.at(inst_g.po.at(pin)).edges.erase(pin); 
         inst_g.vertices.at(inst_g.po.at(pin)).edges.emplace(wire_name);
@@ -903,17 +904,17 @@ inline void Des::_build_graph(const std::string& module_name){
         // This is the input of the instance 
 
         // Update the vertex name in edge 
-        edge_iter->second.to = std::get<1>(inst_pair) + inst_g.pi.at(pin);
+        edge_iter->second.to = std::get<1>(inst_pair) + _divider + inst_g.pi.at(pin);
 
         // Update the edge name in vertex
         inst_g.vertices.at(inst_g.pi.at(pin)).edges.erase(pin); 
         inst_g.vertices.at(inst_g.pi.at(pin)).edges.emplace(wire_name);
 
-        // Update the edge name in pi
+        // Update the edge name in pi 
         replace_key<std::string>(pin, wire_name, inst_g.pi); 
       }
       else{
-        edge_iter->second.from = std::get<1>(inst_pair) + inst_g.po.at(pin);
+        edge_iter->second.from = std::get<1>(inst_pair) + _divider + inst_g.po.at(pin);
 
         inst_g.vertices.at(inst_g.po.at(pin)).edges.erase(pin); 
         inst_g.vertices.at(inst_g.po.at(pin)).edges.emplace(wire_name);
@@ -936,19 +937,21 @@ inline void Des::_build_graph(const std::string& module_name){
             inst_g.po.find(e) == inst_g.po.end() and 
             g.pi.find(e) == g.pi.end() and 
             g.po.find(e) == g.po.end() ){
-            new_v.edges.insert(inst.first+e);
+            new_v.edges.insert(inst.first+_divider+e);
           }
           else{
             new_v.edges.insert(e);
           }
         }
-        g.vertices.insert({inst.first+k, std::move(new_v)});
+        g.vertices.insert({inst.first+_divider+k, std::move(new_v)});
       }
       for(auto &[k, e]: inst_g.edges){
-        // Update the vertices in edge
+        // Update the vertices in edge 
+        e.from.insert(0, 1, _divider);
+        e.to.insert(0, 1, _divider);
         e.from.insert(0, inst.first);
         e.to.insert(0, inst.first);
-        g.edges.insert({inst.first+k, std::move(e)});
+        g.edges.insert({inst.first+_divider+k, std::move(e)});
       }
     }
   }
